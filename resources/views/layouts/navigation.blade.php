@@ -13,7 +13,12 @@
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
+                        {{ __('Extend/Advance') }}
+                    </x-nav-link>
+
+                    <!-- --- LINK BARU DI SINI --- -->
+                    <x-nav-link :href="route('airports.index')" :active="request()->routeIs('airports.*')">
+                        {{ __('Manajemen Bandara') }}
                     </x-nav-link>
                 </div>
             </div>

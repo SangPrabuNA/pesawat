@@ -1,18 +1,25 @@
 <?php
 
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Invoice extends Model
 {
     use HasFactory;
+
     protected $fillable = [
+        'airport_id', // Baru
         'airline',
+        'ground_handling', // Baru
         'flight_number',
+        'flight_number_2', // Baru
         'registration',
         'aircraft_type',
-        'route',
+        'movement_type', // Baru
+        'departure_airport', // Kolom Baru
+        'arrival_airport',
         'service_type',
         'flight_type',
         'charge_type',
@@ -24,7 +31,18 @@ class Invoice extends Model
         'base_rate',
         'base_charge',
         'ppn_charge',
+        'pph_charge',
+        'apply_pph',
         'total_charge',
         'currency',
+        'status',
     ];
+
+    /**
+     * Mendefinisikan relasi bahwa Invoice milik sebuah Airport.
+     */
+    public function airport()
+    {
+        return $this->belongsTo(Airport::class);
+    }
 }
