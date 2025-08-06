@@ -14,9 +14,7 @@ use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Display the registration view.
-     */
+    // ... (method create() tetap sama) ...
     public function create(): View
     {
         return view('auth.register');
@@ -30,14 +28,19 @@ class RegisteredUserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            // Ganti 'name' dengan 'username' dan tambahkan validasi role
+            'username' => ['required', 'string', 'max:255', 'unique:'.User::class],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'role' => ['required', 'string', 'in:user,admin'], // Validasi role
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
+            // Sesuaikan data yang disimpan
+            'name' => $request->username, // Atau 'name' jika Anda ingin kolom name tetap diisi
+            'username' => $request->username,
             'email' => $request->email,
+            'role' => $request->role,
             'password' => Hash::make($request->password),
         ]);
 

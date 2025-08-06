@@ -102,18 +102,23 @@
                                                 {{ $invoice->status }}
                                             </span>
                                         </td>
+                                        {{-- Bagian Aksi Baru dengan Pengecekan Role --}}
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <div class="flex items-center gap-4">
                                                 <a href="{{ route('invoices.show', $invoice->id) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900">Detail</a>
-                                                {{-- Form untuk update status --}}
-                                                <form action="{{ route('invoices.updateStatus', $invoice->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-300 shadow-sm dark:bg-gray-700 dark:border-gray-600 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                                        <option value="Belum Lunas" {{ $invoice->status == 'Belum Lunas' ? 'selected' : '' }}>Belum Lunas</option>
-                                                        <option value="Lunas" {{ $invoice->status == 'Lunas' ? 'selected' : '' }}>Lunas</option>
-                                                    </select>
-                                                </form>
+
+                                                {{-- Cek apakah role user adalah 'admin' --}}
+                                                @if (Auth::user()->role == 'admin')
+                                                    {{-- Jika admin, tampilkan form dengan dropdown --}}
+                                                    <form action="{{ route('invoices.updateStatus', $invoice->id) }}" method="POST">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-300 shadow-sm dark:bg-gray-700 dark:border-gray-600 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                                            <option value="Belum Lunas" {{ $invoice->status == 'Belum Lunas' ? 'selected' : '' }}>Belum Lunas</option>
+                                                            <option value="Lunas" {{ $invoice->status == 'Lunas' ? 'selected' : '' }}>Lunas</option>
+                                                        </select>
+                                                    </form>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>

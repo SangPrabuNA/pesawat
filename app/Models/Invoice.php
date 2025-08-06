@@ -45,4 +45,8 @@ class Invoice extends Model
     {
         return $this->belongsTo(Airport::class);
     }
+    public function details()
+    {
+        return $this->hasMany(InvoiceDetail::class);
+    }
 }

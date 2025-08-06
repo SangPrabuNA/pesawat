@@ -9,8 +9,20 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AirportController;
 use App\Models\Airport;
 
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "web" middleware group. Make something great!
+|
+*/
+
 Route::get('/', function () {
-    return view('welcome');
+    // Arahkan ke halaman login jika belum login, atau ke dashboard jika sudah
+    return auth()->check() ? redirect()->route('dashboard') : view('auth.login');
 });
 
 Route::get('/dashboard', function (Request $request) {
@@ -19,33 +31,32 @@ Route::get('/dashboard', function (Request $request) {
     $selectedMonth = $request->input('month');
     $selectedAirport = $request->input('airport_id');
 
-    // --- PERUBAHAN DI SINI ---
-    // Mengambil daftar tahun dari kolom 'actual_time' bukan 'created_at'
-    $years = Invoice::selectRaw("strftime('%Y', actual_time) as year")
-                    ->whereNotNull('actual_time')
+    // --- PERBAIKAN DI SINI ---
+    // Mengambil daftar tahun dari kolom 'created_at' karena 'actual_time' sudah tidak ada
+    $years = Invoice::selectRaw("strftime('%Y', created_at) as year")
+                    ->whereNotNull('created_at')
                     ->distinct()
                     ->orderBy('year', 'desc')
                     ->pluck('year');
+    
     $airports = Airport::orderBy('iata_code')->get();
 
     // Buat query dasar, lalu terapkan filter jika ada
     $invoices = Invoice::query()
-        ->with('airport')
+        ->with(['airport', 'details']) // Eager load relasi
         ->when($selectedYear, function ($query, $year) {
-            return $query->whereRaw("strftime('%Y', actual_time) = ?", [$year]);
+            // Filter berdasarkan tahun dari 'created_at'
+            return $query->whereRaw("strftime('%Y', created_at) = ?", [$year]);
         })
-        // --- PERUBAHAN DI SINI ---
-        // Memfilter berdasarkan bulan dari 'actual_time'
         ->when($selectedMonth, function ($query, $month) {
-            // str_pad untuk memastikan format bulan selalu 2 digit (misal: '01', '02', '11')
-            return $query->whereRaw("strftime('%m', actual_time) = ?", [str_pad($month, 2, '0', STR_PAD_LEFT)]);
+            // Filter berdasarkan bulan dari 'created_at'
+            return $query->whereRaw("strftime('%m', created_at) = ?", [str_pad($month, 2, '0', STR_PAD_LEFT)]);
         })
         ->when($selectedAirport, function ($query, $airportId) { // Terapkan filter bandara
             return $query->where('airport_id', $airportId);
         })
-        // --- PERUBAHAN DI SINI ---
-        // Mengurutkan berdasarkan 'actual_time' agar relevan dengan filter
-        ->orderBy('actual_time', 'asc')
+        // Mengurutkan berdasarkan tanggal pembuatan invoice
+        ->orderBy('created_at', 'desc')
         ->get();
 
     // Kirim semua data yang dibutuhkan ke view

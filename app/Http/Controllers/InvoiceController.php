@@ -7,10 +7,20 @@ use App\Models\Invoice;
 use App\Models\Airport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
+use App\Models\InvoiceDetail; // <-- Jangan lupa import
 
 class InvoiceController extends Controller
 {
-    // ... (metode lain seperti index, create, dll. tetap sama) ...
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware(function ($request, $next) {
+            if (auth()->user()->role !== 'admin') {
+                return redirect()->route('dashboard')->with('error', 'Anda tidak memiliki hak akses untuk mengubah status invoice.');
+            }
+            return $next($request);
+        })->only('updateStatus');
+    }
 
     public function create()
     {
@@ -28,86 +38,133 @@ class InvoiceController extends Controller
             'flight_number_2' => 'nullable|string|max:255',
             'registration' => 'required|string|max:255',
             'aircraft_type' => 'required|string|max:255',
-            'movement_type' => 'required|in:Departure,Arrival',
-            'other_airport' => 'required|string|max:4|min:4', // Validasi untuk 4 karakter ICAO
-            'actual_time' => 'required|date_format:Y-m-d\TH:i',
+            'other_airport' => 'required|string|max:255', // Rute
+            
+            'movements' => 'required|array|min:1',
+            'movements.*' => 'in:Arrival,Departure',
+            'arrival_time' => 'required_if:movements,Arrival|nullable|date_format:Y-m-d\TH:i',
+            'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
+
             'flight_type' => 'required|in:Domestik,Internasional',
+            'usd_exchange_rate' => 'required_if:flight_type,Internasional|nullable|numeric|min:1',
             'service_type' => 'required|in:APP,TWR,AFIS',
             'charge_type' => 'required|in:Advance,Extend',
             'apply_pph' => 'nullable|boolean',
         ]);
 
-        $airport = Airport::find($validated['airport_id']);
-        $actual_time = new \DateTime($validated['actual_time']);
+        // 1. Buat Invoice Induk
+        $invoice = Invoice::create([
+            'airport_id' => $validated['airport_id'],
+            'airline' => $validated['airline'],
+            'ground_handling' => $validated['ground_handling'],
+            'flight_number' => $validated['flight_number'],
+            'flight_number_2' => $validated['flight_number_2'],
+            'registration' => $validated['registration'],
+            'aircraft_type' => $validated['aircraft_type'],
+            // Simpan rute gabungan
+            'departure_airport' => $validated['other_airport'],
+            'arrival_airport' => $validated['other_airport'],
+            'flight_type' => $validated['flight_type'],
+            'service_type' => $validated['service_type'],
+            'currency' => ($validated['flight_type'] == 'Domestik') ? 'IDR' : 'USD',
+            'usd_exchange_rate' => $validated['usd_exchange_rate'] ?? null,
+            'ppn_charge' => 0,
+            'pph_charge' => 0,
+            'total_charge' => 0,
+            'apply_pph' => $request->has('apply_pph'),
+        ]);
 
-        // --- PERUBAHAN LOGIKA DI SINI: Menyimpan Kode ICAO ---
-        if ($validated['movement_type'] == 'Departure') {
-            $validated['departure_airport'] = $airport->icao_code; // Gunakan ICAO
-            $validated['arrival_airport'] = strtoupper($validated['other_airport']);
-        } else { // Arrival
-            $validated['departure_airport'] = strtoupper($validated['other_airport']);
-            $validated['arrival_airport'] = $airport->icao_code; // Gunakan ICAO
+        $airport = Airport::find($validated['airport_id']);
+        $totalBaseCharge = 0;
+
+        // 2. Loop setiap pergerakan untuk membuat InvoiceDetail
+        foreach ($validated['movements'] as $movement) {
+            $actual_time_str = ($movement == 'Arrival') ? $validated['arrival_time'] : $validated['departure_time'];
+            $actual_time = new \DateTime($actual_time_str);
+
+            $duration_minutes = $this->calculateDuration($actual_time, $airport, $validated['charge_type']);
+            $billed_hours = ceil($duration_minutes / 60);
+            
+            list($base_rate, $base_charge) = $this->calculateCharges(
+                $validated['flight_type'], 
+                $validated['service_type'], 
+                $billed_hours, 
+                $validated['usd_exchange_rate'] ?? null
+            );
+
+            $invoice->details()->create([
+                'movement_type' => $movement,
+                'actual_time' => $actual_time,
+                'charge_type' => $validated['charge_type'],
+                'duration_minutes' => $duration_minutes,
+                'billed_hours' => $billed_hours,
+                'base_rate' => $base_rate,
+                'base_charge' => $base_charge,
+            ]);
+
+            $totalBaseCharge += $base_charge;
         }
 
-        // ... (sisa logika perhitungan tetap sama) ...
-        $op_hour_start = $airport->op_start;
-        $op_hour_end = $airport->op_end;
-        $rates = [
-            'Domestik' => ['APP' => 822000, 'TWR' => 575500, 'AFIS' => 246500],
-            'Internasional' => ['APP' => 76, 'TWR' => 53, 'AFIS' => 23],
-        ];
-        $ppn_rate = 0.11;
+        // 3. Hitung total akhir dan update invoice induk
+        $totalPpn = 0;
+        $totalPph = 0;
+        if ($invoice->currency == 'IDR') {
+            $totalPpn = $totalBaseCharge * 0.11;
+            if ($invoice->apply_pph) {
+                $totalPph = $totalBaseCharge * 0.02;
+            }
+        }
+        
+        $invoice->ppn_charge = $totalPpn;
+        $invoice->pph_charge = $totalPph;
+        $invoice->total_charge = $totalBaseCharge + $totalPpn - $totalPph;
+        $invoice->save();
 
+        return redirect()->route('invoices.show', $invoice);
+    }
+
+    // Fungsi helper untuk merapikan kode
+    private function calculateDuration(\DateTime $actual_time, Airport $airport, string $charge_type): int
+    {
         $duration_minutes = 0;
-        if ($validated['charge_type'] == 'Advance') {
-            $op_start_time = new \DateTime($actual_time->format('Y-m-d') . ' ' . $op_hour_start);
+        if ($charge_type == 'Advance') {
+            $op_start_time = new \DateTime($actual_time->format('Y-m-d') . ' ' . $airport->op_start);
             if ($actual_time > $op_start_time) {
                 $op_start_time->modify('+1 day');
             }
             $duration_minutes = round(($op_start_time->getTimestamp() - $actual_time->getTimestamp()) / 60);
         } else { // Extend
-            $op_end_time = new \DateTime($actual_time->format('Y-m-d') . ' ' . $op_hour_end);
+            $op_end_time = new \DateTime($actual_time->format('Y-m-d') . ' ' . $airport->op_end);
             $duration_minutes = round(($actual_time->getTimestamp() - $op_end_time->getTimestamp()) / 60);
         }
+        return $duration_minutes < 0 ? 0 : $duration_minutes;
+    }
 
-        if ($duration_minutes < 0) $duration_minutes = 0;
-        $billed_hours = ceil($duration_minutes / 60);
+    private function calculateCharges(string $flight_type, string $service_type, int $billed_hours, ?float $exchange_rate): array
+    {
+        $rates_in_rupiah = ['APP' => 822000, 'TWR' => 575500, 'AFIS' => 246500];
+        $base_rate = 0;
+        $base_charge = 0;
 
-        $base_rate = $rates[$validated['flight_type']][$validated['service_type']];
-        $base_charge = $base_rate * $billed_hours;
-
-        $ppn_charge = ($validated['flight_type'] == 'Domestik') ? $base_charge * $ppn_rate : 0;
-        $pph_charge = 0;
-        if ($request->has('apply_pph')) {
-            $pph_charge = ($validated['flight_type'] == 'Domestik') ? $base_charge * 0.02 : 0;
+        if ($flight_type == 'Domestik') {
+            $base_rate = $rates_in_rupiah[$service_type];
+            $base_charge = $base_rate * $billed_hours;
+        } else { // Internasional
+            $rupiah_rate = $rates_in_rupiah[$service_type];
+            $base_rate = $rupiah_rate / $exchange_rate;
+            $base_charge = $base_rate * $billed_hours;
         }
-        $total_charge = $base_charge + $ppn_charge - $pph_charge;
-
-        $invoiceData = array_merge($validated, [
-            'actual_time' => $actual_time,
-            'operational_hour_start' => $op_hour_start,
-            'operational_hour_end' => $op_hour_end,
-            'duration_minutes' => $duration_minutes,
-            'billed_hours' => $billed_hours,
-            'base_rate' => $base_rate,
-            'base_charge' => $base_charge,
-            'ppn_charge' => $ppn_charge,
-            'pph_charge' => $pph_charge,
-            'apply_pph' => $request->has('apply_pph'),
-            'total_charge' => $total_charge,
-            'currency' => ($validated['flight_type'] == 'Domestik') ? 'IDR' : 'USD',
-        ]);
-
-        $invoice = Invoice::create($invoiceData);
-
-        return redirect()->route('invoices.show', $invoice);
+        return [$base_rate, $base_charge];
     }
 
     public function show(Invoice $invoice)
     {
+        // Eager load relasi details
+        $invoice->load('details', 'airport');
         return view('invoice.show', ['invoice' => $invoice]);
     }
-
+    
+    // ... sisa controller (downloadPDF, updateStatus) tetap sama ...
     public function downloadPDF(Invoice $invoice)
     {
         $data = ['invoice' => $invoice];
