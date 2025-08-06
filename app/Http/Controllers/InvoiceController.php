@@ -7,7 +7,7 @@ use App\Models\Invoice;
 use App\Models\Airport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
-use App\Models\InvoiceDetail; // <-- Jangan lupa import
+use App\Models\InvoiceDetail;
 
 class InvoiceController extends Controller
 {
@@ -52,6 +52,8 @@ class InvoiceController extends Controller
             'apply_pph' => 'nullable|boolean',
         ]);
 
+        $airport = Airport::find($validated['airport_id']);
+
         // 1. Buat Invoice Induk
         $invoice = Invoice::create([
             'airport_id' => $validated['airport_id'],
@@ -61,9 +63,16 @@ class InvoiceController extends Controller
             'flight_number_2' => $validated['flight_number_2'],
             'registration' => $validated['registration'],
             'aircraft_type' => $validated['aircraft_type'],
-            // Simpan rute gabungan
+            
+            // --- PERBAIKAN DI SINI ---
+            // Kita perlu mengisi kolom yang wajib diisi
+            'operational_hour_start' => $airport->op_start,
+            'operational_hour_end' => $airport->op_end,
+            
+            // Simpan rute gabungan (ini bisa disesuaikan lagi jika perlu)
             'departure_airport' => $validated['other_airport'],
             'arrival_airport' => $validated['other_airport'],
+            
             'flight_type' => $validated['flight_type'],
             'service_type' => $validated['service_type'],
             'currency' => ($validated['flight_type'] == 'Domestik') ? 'IDR' : 'USD',
@@ -74,7 +83,6 @@ class InvoiceController extends Controller
             'apply_pph' => $request->has('apply_pph'),
         ]);
 
-        $airport = Airport::find($validated['airport_id']);
         $totalBaseCharge = 0;
 
         // 2. Loop setiap pergerakan untuk membuat InvoiceDetail
@@ -159,12 +167,10 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice)
     {
-        // Eager load relasi details
         $invoice->load('details', 'airport');
         return view('invoice.show', ['invoice' => $invoice]);
     }
     
-    // ... sisa controller (downloadPDF, updateStatus) tetap sama ...
     public function downloadPDF(Invoice $invoice)
     {
         $data = ['invoice' => $invoice];
