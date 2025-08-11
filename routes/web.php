@@ -9,16 +9,6 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AirportController;
 use App\Models\Airport;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
 
 Route::get('/', function () {
     // Arahkan ke halaman login jika belum login, atau ke dashboard jika sudah
@@ -33,12 +23,12 @@ Route::get('/dashboard', function (Request $request) {
 
     // --- PERBAIKAN DI SINI ---
     // Mengambil daftar tahun dari kolom 'created_at' karena 'actual_time' sudah tidak ada
-    $years = Invoice::selectRaw("strftime('%Y', created_at) as year")
+    $years = Invoice::selectRaw("YEAR(created_at) as year")
                     ->whereNotNull('created_at')
                     ->distinct()
                     ->orderBy('year', 'desc')
                     ->pluck('year');
-    
+
     $airports = Airport::orderBy('iata_code')->get();
 
     // Buat query dasar, lalu terapkan filter jika ada

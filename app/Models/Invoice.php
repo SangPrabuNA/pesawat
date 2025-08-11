@@ -33,6 +33,7 @@ class Invoice extends Model
         'ppn_charge',
         'pph_charge',
         'apply_pph',
+        'is_free_charge',
         'total_charge',
         'currency',
         'status',

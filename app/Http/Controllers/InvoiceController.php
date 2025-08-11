@@ -38,23 +38,21 @@ class InvoiceController extends Controller
             'flight_number_2' => 'nullable|string|max:255',
             'registration' => 'required|string|max:255',
             'aircraft_type' => 'required|string|max:255',
-            'other_airport' => 'required|string|max:255', // Rute
-            
+            'other_airport' => 'required|string|max:255',
             'movements' => 'required|array|min:1',
             'movements.*' => 'in:Arrival,Departure',
             'arrival_time' => 'required_if:movements,Arrival|nullable|date_format:Y-m-d\TH:i',
             'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
-
             'flight_type' => 'required|in:Domestik,Internasional',
             'usd_exchange_rate' => 'required_if:flight_type,Internasional|nullable|numeric|min:1',
             'service_type' => 'required|in:APP,TWR,AFIS',
-            'charge_type' => 'required|in:Advance,Extend',
             'apply_pph' => 'nullable|boolean',
+            'is_free_charge' => 'nullable|boolean',
         ]);
 
         $airport = Airport::find($validated['airport_id']);
+        $isFreeCharge = $request->has('is_free_charge');
 
-        // 1. Buat Invoice Induk
         $invoice = Invoice::create([
             'airport_id' => $validated['airport_id'],
             'airline' => $validated['airline'],
@@ -63,47 +61,59 @@ class InvoiceController extends Controller
             'flight_number_2' => $validated['flight_number_2'],
             'registration' => $validated['registration'],
             'aircraft_type' => $validated['aircraft_type'],
-            
-            // --- PERBAIKAN DI SINI ---
-            // Kita perlu mengisi kolom yang wajib diisi
             'operational_hour_start' => $airport->op_start,
             'operational_hour_end' => $airport->op_end,
-            
-            // Simpan rute gabungan (ini bisa disesuaikan lagi jika perlu)
             'departure_airport' => $validated['other_airport'],
             'arrival_airport' => $validated['other_airport'],
-            
             'flight_type' => $validated['flight_type'],
             'service_type' => $validated['service_type'],
             'currency' => ($validated['flight_type'] == 'Domestik') ? 'IDR' : 'USD',
             'usd_exchange_rate' => $validated['usd_exchange_rate'] ?? null,
-            'ppn_charge' => 0,
-            'pph_charge' => 0,
-            'total_charge' => 0,
+            'ppn_charge' => 0, 'pph_charge' => 0, 'total_charge' => 0,
             'apply_pph' => $request->has('apply_pph'),
+            'is_free_charge' => $isFreeCharge,
         ]);
 
         $totalBaseCharge = 0;
 
-        // 2. Loop setiap pergerakan untuk membuat InvoiceDetail
         foreach ($validated['movements'] as $movement) {
             $actual_time_str = ($movement == 'Arrival') ? $validated['arrival_time'] : $validated['departure_time'];
             $actual_time = new \DateTime($actual_time_str);
 
-            $duration_minutes = $this->calculateDuration($actual_time, $airport, $validated['charge_type']);
+            // --- PERBAIKAN LOGIKA OTOMATISASI DI SINI ---
+            $time_only = $actual_time->format('H:i:s');
+            $op_start = $airport->op_start;
+            $op_end = $airport->op_end;
+            $charge_type = null;
+
+            if ($time_only < $op_start) {
+                $charge_type = 'Advance';
+            } elseif ($time_only > $op_end) {
+                $charge_type = 'Extend';
+            }
+
+            if (!$charge_type) {
+                continue;
+            }
+            // --- AKHIR PERBAIKAN ---
+
+            $duration_minutes = $this->calculateDuration($actual_time, $airport, $charge_type);
             $billed_hours = ceil($duration_minutes / 60);
-            
-            list($base_rate, $base_charge) = $this->calculateCharges(
-                $validated['flight_type'], 
-                $validated['service_type'], 
-                $billed_hours, 
-                $validated['usd_exchange_rate'] ?? null
-            );
+
+            if ($isFreeCharge) {
+                $base_rate = 0;
+                $base_charge = 0;
+            } else {
+                list($base_rate, $base_charge) = $this->calculateCharges(
+                    $validated['flight_type'], $validated['service_type'],
+                    $billed_hours, $validated['usd_exchange_rate'] ?? null
+                );
+            }
 
             $invoice->details()->create([
                 'movement_type' => $movement,
                 'actual_time' => $actual_time,
-                'charge_type' => $validated['charge_type'],
+                'charge_type' => $charge_type,
                 'duration_minutes' => $duration_minutes,
                 'billed_hours' => $billed_hours,
                 'base_rate' => $base_rate,
@@ -113,25 +123,26 @@ class InvoiceController extends Controller
             $totalBaseCharge += $base_charge;
         }
 
-        // 3. Hitung total akhir dan update invoice induk
-        $totalPpn = 0;
-        $totalPph = 0;
-        if ($invoice->currency == 'IDR') {
-            $totalPpn = $totalBaseCharge * 0.11;
+        if (!$isFreeCharge) {
+            $totalPpn = 0;
+            $totalPph = 0;
+            if ($invoice->currency == 'IDR') {
+                $totalPpn = $totalBaseCharge * 0.11;
+            }
             if ($invoice->apply_pph) {
                 $totalPph = $totalBaseCharge * 0.02;
             }
+            $invoice->ppn_charge = $totalPpn;
+            $invoice->pph_charge = $totalPph;
+            $invoice->total_charge = $totalBaseCharge + $totalPpn - $totalPph;
         }
-        
-        $invoice->ppn_charge = $totalPpn;
-        $invoice->pph_charge = $totalPph;
-        $invoice->total_charge = $totalBaseCharge + $totalPpn - $totalPph;
+
         $invoice->save();
 
-        return redirect()->route('invoices.show', $invoice);
+        return redirect()->route('invoices.show', $invoice)->with('success', 'Invoice berhasil dibuat.');
     }
 
-    // Fungsi helper untuk merapikan kode
+    // ... sisa metode (calculateDuration, calculateCharges, show, dll.) tetap sama ...
     private function calculateDuration(\DateTime $actual_time, Airport $airport, string $charge_type): int
     {
         $duration_minutes = 0;
@@ -170,7 +181,7 @@ class InvoiceController extends Controller
         $invoice->load('details', 'airport');
         return view('invoice.show', ['invoice' => $invoice]);
     }
-    
+
     public function downloadPDF(Invoice $invoice)
     {
         $data = ['invoice' => $invoice];
