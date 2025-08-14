@@ -6,20 +6,29 @@
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}">
-                        <img src="{{ asset('images/LOGO1.png') }}" alt="Logo Perusahaan" class="block h-9 w-auto">
+                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800 dark:text-gray-200" />
                     </a>
                 </div>
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Extend/Advance') }}
+                        {{ __('Dashboard') }}
                     </x-nav-link>
 
-                    <!-- --- LINK BARU DI SINI --- -->
-                    <x-nav-link :href="route('airports.index')" :active="request()->routeIs('airports.*')">
-                        {{ __('Manajemen Bandara') }}
-                    </x-nav-link>
+                    {{-- Link ini hanya muncul untuk Admin dan Master --}}
+                    @if(in_array(auth()->user()->role, ['admin', 'master']))
+                        <x-nav-link :href="route('airports.index')" :active="request()->routeIs('airports.*')">
+                            {{ __('Manajemen Bandara') }}
+                        </x-nav-link>
+                    @endif
+
+                    {{-- Link ini hanya muncul untuk Master --}}
+                    @if(auth()->user()->role === 'master')
+                        <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
+                            {{ __('Manajemen Pengguna') }}
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -75,6 +84,18 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+
+            @if(in_array(auth()->user()->role, ['admin', 'master']))
+                <x-responsive-nav-link :href="route('airports.index')" :active="request()->routeIs('airports.*')">
+                    {{ __('Manajemen Bandara') }}
+                </x-responsive-nav-link>
+            @endif
+
+            @if(auth()->user()->role === 'master')
+                <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
+                    {{ __('Manajemen Pengguna') }}
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->

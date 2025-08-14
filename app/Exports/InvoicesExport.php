@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\Invoice;
+use App\Models\InvoiceDetail; // <-- Change model to InvoiceDetail
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -12,86 +12,85 @@ class InvoicesExport implements FromQuery, WithHeadings, WithMapping
 {
     protected $year;
     protected $month;
-    protected $airportId; // Tambahkan properti baru
+    protected $airportId;
     private $rowNumber = 0;
 
-    // Update constructor untuk menerima airportId
     public function __construct($year, $month, $airportId)
     {
         $this->year = $year;
         $this->month = $month;
-        $this->airportId = $airportId; // Simpan airportId
+        $this->airportId = $airportId;
     }
 
     /**
-     * @return \Illuminate\Database\Query\Builder
+     * The query is now based on InvoiceDetail.
      */
     public function query()
     {
-        return Invoice::query()
-            ->when($this->year, function ($query, $year) {
-                return $query->whereRaw("strftime('%Y', actual_time) = ?", [$year]);
+        return InvoiceDetail::query()
+            ->with(['invoice.airport']) // Eager load relationships
+            ->whereHas('invoice', function ($query) { // Apply filters to the parent invoice
+                $query->when($this->year, function ($q, $year) {
+                    return $q->whereYear('created_at', $year);
+                })
+                ->when($this->month, function ($q, $month) {
+                    return $q->whereMonth('created_at', $month);
+                })
+                ->when($this->airportId, function ($q, $airportId) {
+                    return $q->where('airport_id', $airportId);
+                });
             })
-            ->when($this->month, function ($query, $month) {
-                return $query->whereRaw("strftime('%m', actual_time) = ?", [str_pad($month, 2, '0', STR_PAD_LEFT)]);
-            })
-            ->when($this->airportId, function ($query, $airportId) { // Tambahkan kondisi filter bandara
-                return $query->where('airport_id', $airportId);
-            })
-            ->orderBy('actual_time', 'asc');
+            ->orderBy('actual_time', 'asc'); // Now we can correctly order by actual_time
     }
 
     /**
-     * @return array
+     * The headings are updated to reflect the detailed view.
      */
     public function headings(): array
     {
-        // Menambahkan kolom Bandara di awal
         return [
             'NO',
-            'Bandara', // Kolom baru
-            'Tanggal',
-            'Nama Airline',
+            'Invoice ID',
+            'Bandara',
+            'Tanggal Aktual',
+            'Waktu Aktual',
+            'Airline',
             'Call Sign',
             'Registrasi A/C',
-            'DOM/INT',
-            'ATD/ATA',
-            'Extend/Advance',
+            'Movement',
+            'Jenis Biaya',
             'Durasi (Jam:Menit)',
-            'Tagihan',
-            'PPN 11%',
-            'PPH 23',
-            'Total Tagihan',
+            'Total Tagihan (Invoice)',
             'Status Pembayaran',
         ];
     }
 
     /**
-     * @param Invoice $invoice
-     * @return array
+     * The map function now processes an InvoiceDetail object.
+     * @param InvoiceDetail $detail
      */
-    public function map($invoice): array
+    public function map($detail): array
     {
-        $totalMinutes = $invoice->duration_minutes;
+        $invoice = $detail->invoice; // Get the parent invoice from the relationship
+
+        $totalMinutes = $detail->duration_minutes;
         $hours = floor($totalMinutes / 60);
         $minutes = $totalMinutes % 60;
         $formattedDuration = $hours . ':' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
 
         return [
             ++$this->rowNumber,
-            $invoice->airport->iata_code ?? 'N/A', // Tambahkan data bandara
-            Carbon::parse($invoice->actual_time)->format('d-m-Y'),
+            $invoice->id,
+            $invoice->airport->iata_code ?? 'N/A',
+            Carbon::parse($detail->actual_time)->format('d-m-Y'),
+            Carbon::parse($detail->actual_time)->format('H:i'),
             $invoice->airline,
             $invoice->flight_number,
             $invoice->registration,
-            $invoice->flight_type,
-            Carbon::parse($invoice->actual_time)->format('H:i'),
-            $invoice->charge_type,
+            $detail->movement_type,
+            $detail->charge_type,
             $formattedDuration,
-            $invoice->base_charge,
-            $invoice->ppn_charge,
-            $invoice->pph_charge,
-            $invoice->total_charge,
+            number_format($invoice->total_charge, 2) . ' ' . $invoice->currency,
             $invoice->status,
         ];
     }
