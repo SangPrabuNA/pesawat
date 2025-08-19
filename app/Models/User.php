@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'avatar',
         'airport_id',
+        'signature',
     ];
 
     /**

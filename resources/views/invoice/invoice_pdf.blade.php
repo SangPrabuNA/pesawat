@@ -330,7 +330,12 @@
         <div class="signature-block">
             Petugas Official AIRNAV INDONESIA
             <div class="signature-space"></div>
-            <div class="text-strong">( Furqaan Kurniawan Fuddy )</div>
+            @if($invoice->creator && $invoice->creator->signature)
+                <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-bottom: 5px;">
+            @else
+                <div style="height: 45px;"></div>
+            @endif
+            <div class="text-strong">( {{ $invoice->creator->name ?? '..........................' }} )</div>
         </div>
     </div>
 </body>

@@ -9,6 +9,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use App\Models\InvoiceDetail;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class InvoiceController extends Controller
 {
@@ -116,6 +117,7 @@ class InvoiceController extends Controller
             'is_free_charge' => $isFreeCharge,
             'created_at' => $invoiceDate, // Simpan tanggal invoice yang dipilih
             'updated_at' => $invoiceDate,
+            'created_by' => Auth::id(),
         ]);
 
         $totalBaseCharge = 0;
@@ -191,6 +193,7 @@ class InvoiceController extends Controller
      */
     public function downloadPDF(Invoice $invoice)
     {
+        $invoice->load('details', 'airport', 'creator');
         $invoiceHtml = view('invoice.invoice_pdf', ['invoice' => $invoice])->render();
         $receiptHtml = view('invoice.receipt_pdf', ['invoice' => $invoice])->render();
         $fullHtml = $invoiceHtml . $receiptHtml;

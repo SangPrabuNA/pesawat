@@ -25,32 +25,27 @@ class ProfileController extends Controller
     /**
      * Update the user's profile information.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
-    {
+    public function update(ProfileUpdateRequest $request) {
         $user = $request->user();
-
-        // Isi data user dengan data yang sudah divalidasi (termasuk name dan email)
         $user->fill($request->validated());
 
-        // Hapus verifikasi email jika email diubah
-        if ($user->isDirty('email')) {
-            $user->email_verified_at = null;
+        if ($request->user()->isDirty('email')) {
+            $request->user()->email_verified_at = null;
         }
 
-        // Cek jika pengguna mengunggah file avatar baru
-        if ($request->hasFile('avatar')) {
-            // Hapus avatar lama jika ada
-            if ($user->avatar) {
-                Storage::delete('public/' . $user->avatar);
+        // Logika untuk unggah tanda tangan
+        if ($request->hasFile('signature')) {
+            // Hapus file lama jika ada
+            if ($user->signature) {
+                Storage::disk('public')->delete($user->signature);
             }
-
-            // Simpan file baru dan update kolom avatar
-            $user->avatar = $request->file('avatar')->store('avatars', 'public');
+            // Simpan file baru dan dapatkan path-nya
+            $path = $request->file('signature')->store('signatures', 'public');
+            $user->signature = $path;
         }
 
         $user->save();
-
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        return redirect()->route('profile.edit')->with('status', 'profile-updated');
     }
 
     /**

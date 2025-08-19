@@ -11,6 +11,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'airport_id', // Baru
+        'created_by',
         'airline',
         'ground_handling', // Baru
         'flight_number',
@@ -50,5 +51,8 @@ class Invoice extends Model
     public function details()
     {
         return $this->hasMany(InvoiceDetail::class);
+    }
+    public function creator() {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }
