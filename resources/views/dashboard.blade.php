@@ -9,16 +9,21 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
-                    {{-- Menampilkan pesan sukses setelah update status --}}
+                    {{-- Menampilkan pesan sukses/error --}}
                     @if (session('success'))
                         <div class="mb-4 p-4 bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200 rounded-lg">
                             {{ session('success') }}
                         </div>
                     @endif
+                     @if (session('error'))
+                        <div class="mb-4 p-4 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 rounded-lg">
+                            {{ session('error') }}
+                        </div>
+                    @endif
 
                     <div class="flex justify-between items-center">
                         <p>{{ __("Selamat Datang") }}</p>
-                        <a href="{{ route('invoices.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <a href="{{ route('invoices.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500">
                             Buat Invoice Baru
                         </a>
                     </div>
@@ -75,9 +80,57 @@
                         </div>
                     </form>
 
-                    {{-- Tabel Invoice (Tidak ada perubahan di sini) --}}
                     <div class="overflow-x-auto">
-                        {{-- ... Tabel Anda ... --}}
+                         <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Bandara</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Airline</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">No. Penerbangan</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Total Tagihan</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                @forelse ($invoices as $invoice)
+                                    <tr>
+                                        {{-- PERBAIKAN DI SINI: Menambahkan null safe operator --}}
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">{{ $invoice->airport->iata_code ?? 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $invoice->airline }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $invoice->flight_number }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            {{ number_format($invoice->total_charge, 2) }} {{ $invoice->currency }}
+                                            @if($invoice->currency == 'USD' && isset($usdRate))
+                                                <span class="text-gray-400 text-xs block">(Rp {{ number_format($invoice->total_charge * $usdRate, 2) }})</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $invoice->status == 'Lunas' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800' }}">
+                                                {{ $invoice->status }}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex items-center gap-4">
+                                                <a href="{{ route('invoices.show', $invoice->id) }}" class="text-indigo-400 hover:text-indigo-300">Detail</a>
+                                                <form action="{{ route('invoices.updateStatus', $invoice->id) }}" method="POST">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-600 bg-gray-700 shadow-sm focus:border-indigo-300 focus:ring-indigo-200">
+                                                        <option value="Belum Lunas" @selected($invoice->status == 'Belum Lunas')>Belum Lunas</option>
+                                                        <option value="Lunas" @selected($invoice->status == 'Lunas')>Lunas</option>
+                                                    </select>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">Tidak ada data.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

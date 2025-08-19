@@ -37,6 +37,7 @@ class Invoice extends Model
         'total_charge',
         'currency',
         'status',
+        'created_at',
     ];
 
     /**

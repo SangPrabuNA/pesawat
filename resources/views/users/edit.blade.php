@@ -1,4 +1,3 @@
-{{-- Form Edit Pengguna --}}
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -29,7 +28,7 @@
                             </select>
                         </div>
                         <div class="mt-4" id="airport_select_div">
-                            <x-input-label for="airport_id" value="Bandara (Khusus Admin)" />
+                            <x-input-label for="airport_id" value="Bandara (Khusus Admin & User)" />
                             <select name="airport_id" id="airport_id" class="block mt-1 w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
                                 <option value="">-- Tidak Terikat Bandara --</option>
                                 @foreach($airports as $airport)
@@ -51,10 +50,15 @@
             const roleSelect = document.getElementById('role');
             const airportDiv = document.getElementById('airport_select_div');
             function toggleAirportSelect() {
-                airportDiv.style.display = roleSelect.value === 'admin' ? 'block' : 'none';
+                // Tampilkan jika role adalah 'admin' ATAU 'user'
+                if (roleSelect.value === 'admin' || roleSelect.value === 'user') {
+                    airportDiv.style.display = 'block';
+                } else {
+                    airportDiv.style.display = 'none';
+                }
             }
             roleSelect.addEventListener('change', toggleAirportSelect);
-            toggleAirportSelect();
+            toggleAirportSelect(); // Panggil saat halaman dimuat
         });
     </script>
 </x-app-layout>

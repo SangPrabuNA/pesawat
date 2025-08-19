@@ -28,8 +28,9 @@ class UserController extends Controller
             'airport_id' => 'nullable|exists:airports,id',
         ]);
 
-        // Pastikan airport_id di-set null jika role bukan admin
-        if ($validated['role'] !== 'admin') {
+        // --- PERBAIKAN DI SINI ---
+        // Pastikan airport_id di-set null hanya jika role adalah 'master'
+        if ($validated['role'] === 'master') {
             $validated['airport_id'] = null;
         }
 
