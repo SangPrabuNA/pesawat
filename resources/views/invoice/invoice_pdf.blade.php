@@ -326,17 +326,27 @@
         </table>
     </div>
 
-    <div class="footer-section">
-        <div class="signature-block">
-            Petugas Official AIRNAV INDONESIA
-            <div class="signature-space"></div>
-            @if($invoice->creator && $invoice->creator->signature)
-                <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-bottom: 5px;">
-            @else
-                <div style="height: 45px;"></div>
-            @endif
-            <div class="text-strong">( {{ $invoice->creator->name ?? '..........................' }} )</div>
-        </div>
-    </div>
+    <table class="footer-section">
+        <tr>
+            <td style="width: 60%;" class="cc-block">
+                CC:<br>
+                1. Customer<br>
+                2. Finance<br>
+                3. File
+            </td>
+            <td style="width: 40%;" class="signature-block">
+                Petugas Official AIRNAV INDONESIA
+
+                {{-- PERBAIKAN DI SINI --}}
+                @if($invoice->creator && $invoice->creator->signature && file_exists(storage_path('app/public/' . $invoice->creator->signature)))
+                    <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-top: 5px; margin-bottom: 5px;">
+                @else
+                    <div class="signature-space"></div>
+                @endif
+
+                <div class="text-strong">( {{ $invoice->creator->name ?? '..........................' }} )</div>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

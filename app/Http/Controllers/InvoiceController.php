@@ -95,6 +95,7 @@ class InvoiceController extends Controller
         $routeDisplay = $departureAirport . '-' . $arrivalAirport;
 
         $invoice = Invoice::create([
+            'created_by' => Auth::id(),
             'airport_id' => $validated['airport_id'],
             'airline' => $validated['airline'],
             'paid_by' => $validated['paid_by'] ?? $validated['airline'],
@@ -117,7 +118,7 @@ class InvoiceController extends Controller
             'is_free_charge' => $isFreeCharge,
             'created_at' => $invoiceDate, // Simpan tanggal invoice yang dipilih
             'updated_at' => $invoiceDate,
-            'created_by' => Auth::id(),
+
         ]);
 
         $totalBaseCharge = 0;
@@ -194,10 +195,13 @@ class InvoiceController extends Controller
     public function downloadPDF(Invoice $invoice)
     {
         $invoice->load('details', 'airport', 'creator');
+
         $invoiceHtml = view('invoice.invoice_pdf', ['invoice' => $invoice])->render();
         $receiptHtml = view('invoice.receipt_pdf', ['invoice' => $invoice])->render();
+
         $fullHtml = $invoiceHtml . $receiptHtml;
         $pdf = Pdf::loadHtml($fullHtml);
+
         $fileName = 'invoice-receipt-' . $invoice->id . '-' . Str::slug($invoice->airline) . '.pdf';
         return $pdf->download($fileName);
     }
