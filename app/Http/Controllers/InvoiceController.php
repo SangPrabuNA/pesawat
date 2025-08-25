@@ -74,12 +74,12 @@ class InvoiceController extends Controller
         }
 
         // Tentukan departure dan arrival berdasarkan movement
-        $currentAirportCode = $airport->iata_code;
+        $currentAirportCode = $airport->icao_code;
         $originAirport = strtoupper($validated['origin_airport']);
 
         // Logika:
         // - Jika ada Arrival: origin_airport = bandara asal, current = bandara tujuan
-        // - Jika ada Departure: current = bandara asal, origin_airport = bandara tujuan
+        // - Jika ada Departure: current = bandara asal, origin_airport = ba    ndara tujuan
         $hasArrival = in_array('Arrival', $validated['movements']);
         $hasDeparture = in_array('Departure', $validated['movements']);
 

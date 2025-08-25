@@ -35,9 +35,12 @@
         }
         .footer-table { margin-top: 30px; }
         .footer-table td { vertical-align: top; }
+
+        /* --- PERBAIKAN CSS DI SINI --- */
         .footer-table .signature-block {
-            text-align: center;
-            padding-left: 60%;
+            /* Menghapus padding-left yang membuat sempit */
+            /* padding-left: 60%; */
+            text-align: center; /* Tetap tengahkan konten di dalam sel */
         }
         .footer-table .signature-space { height: 50px; }
         .footer-table .cc-block { font-size: 9px; }
@@ -145,22 +148,24 @@
 
     <table class="footer-table">
         <tr>
-            <td style="width: 60%;" class="cc-block">
+            <!-- Kolom 1: CC Block -->
+            <td style="width: 30%;" class="cc-block">
                 CC:<br>
                 1. Customer<br>
                 2. Finance<br>
                 3. File
             </td>
-            <td style="width: 40%;" class="signature-block">
-                Petugas Official AIRNAV INDONESIA
+            <!-- Kolom 2: Kontainer untuk Tanda Tangan -->
+            <td style="width: 70%;" class="signature-block">
+                <div>Petugas Official AIRNAV INDONESIA</div>
 
-                {{-- PERBAIKAN DI SINI --}}
+                <div>
                 @if($invoice->creator && $invoice->creator->signature && file_exists(storage_path('app/public/' . $invoice->creator->signature)))
                     <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-top: 5px; margin-bottom: 5px;">
                 @else
                     <div class="signature-space"></div>
                 @endif
-
+                </div>
                 <div class="bold">( {{ $invoice->creator->name ?? '..........................' }} )</div>
             </td>
         </tr>
