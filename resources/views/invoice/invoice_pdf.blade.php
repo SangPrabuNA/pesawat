@@ -24,14 +24,13 @@
 
         /* Header */
         .header-table .logo { width: 80px; }
-        .title { /* Disesuaikan agar berlaku umum */
+        .title {
             text-align: center;
             line-height: 1.3;
             font-size: 11px;
             padding: 0 10px;
         }
         .header-table .invoice-details-box {
-            /* border: 1px solid #000; */ /* Dihapus sesuai permintaan */
             padding: 5px;
         }
         .invoice-details-box table td {
@@ -45,9 +44,6 @@
             padding: 2px 0;
             font-size: 10px;
         }
-        /* Dihapus: .main-info-table .label-col { width: 30%; } */
-
-        /* Dihapus: .location-table styles */
 
         /* Tabel Biaya */
         .charges-table { margin-top: 10px; }
@@ -89,12 +85,12 @@
             margin-top: 5px;
         }
         .bank-details-box .bank-logo { width: 100px; }
-        .footer-section { margin-top: 20px; }
-        .footer-section .signature-block {
+        .footer-table { margin-top: 20px; }
+        .footer-table .signature-block {
             text-align: center;
             padding-left: 65%;
         }
-        .footer-section .signature-space { height: 40px; }
+        .footer-table .signature-space { height: 40px; }
     </style>
 </head>
 <body>
@@ -103,13 +99,11 @@
         $logoSrc = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : '';
         $bankLogoPath = public_path('images/BRI.png');
         $bankLogoSrc = file_exists($bankLogoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($bankLogoPath)) : '';
-
         $flightTypeCode = ($invoice->flight_type === 'Domestik') ? '21' : '22';
     @endphp
 
     <!-- BAGIAN HEADER -->
     <div>
-        <!-- Bagian Atas: Logo dan Detail Invoice -->
         <table style="width: 100%;">
             <tr>
                 <td style="width: 50%; text-align: left;">
@@ -120,8 +114,7 @@
                         <table>
                              <tr>
                                  <td><span class="text-strong">NO</span></td>
-                                 <!-- PERUBAHAN FORMAT NOMOR INVOICE DI SINI -->
-                                 <td>: {{ $invoice->airport->icao_code ?? '' }}.{{ $flightTypeCode }}.{{ \Carbon\Carbon::parse($invoice->created_at)->format('Y.m') }}&nbsp;&nbsp;&nbsp;&nbsp;{{ str_pad($invoice->id, 4, '0', STR_PAD_LEFT) }}</td>
+                                 <td>: {{ $invoice->airport->icao_code ?? '' }}.{{ $flightTypeCode }}.{{ \Carbon\Carbon::parse($invoice->created_at)->format('Y.m') }}&nbsp;&nbsp;&nbsp;&nbsp;{{ str_pad($invoice->invoice_sequence_number, 4, '0', STR_PAD_LEFT) }}</td>
                              </tr>
                              <tr>
                                  <td><span class="text-strong">TANGGAL/DATE</span></td>
@@ -132,8 +125,6 @@
                 </td>
             </tr>
         </table>
-
-        <!-- Bagian Bawah: Judul -->
         <table style="width: 100%; margin-top: 20px;">
             <tr>
                 <td class="title va-middle">
@@ -145,22 +136,15 @@
         </table>
     </div>
 
-    <!-- GARIS PEMBATAS -->
     <div style="border-bottom: 1px solid #000; margin-top: 10px; margin-bottom: 10px;"></div>
 
-    <!-- BAGIAN INFORMASI UTAMA (STRUKTUR BARU) -->
+    <!-- BAGIAN INFORMASI UTAMA -->
     <table class="main-info-table">
-        <!-- Define column widths for alignment -->
         <colgroup>
-            <col style="width: 100%;"> <!-- Label -->
-            <col style="width: 5%;">  <!-- Colon -->
-            <col style="width: 5%;">  <!-- L Number -->
-            <col style="width: 27.5%;"> <!-- Location -->
-            <col style="width: 32.5%;"> <!-- Remark -->
+            <col style="width: 30%;"> <col style="width: 5%;"> <col style="width: 5%;">
+            <col style="width: 27.5%;"> <col style="width: 32.5%;">
         </colgroup>
-
         <tbody>
-            <!-- Simple Rows -->
             <tr>
                 <td>AIRLINE/Airline</td>
                 <td colspan="4">: {{ $invoice->airline }}</td>
@@ -171,7 +155,13 @@
             </tr>
             <tr>
                 <td>NOMOR PENERBANGAN/Flight Number</td>
-                <td colspan="4">: {{ $invoice->flight_number }} {{ $invoice->flight_number_2 ? '/ '.$invoice->flight_number_2 : '' }}</td>
+                {{-- --- PERBAIKAN DI SINI --- --}}
+                <td colspan="4">
+                    : 1. {{ $invoice->flight_number }}
+                    @if($invoice->flight_number_2)
+                        <br>&nbsp;&nbsp;2. {{ $invoice->flight_number_2 }}
+                    @endif
+                </td>
             </tr>
             <tr>
                 <td>REGISTRASI/Registration</td>
@@ -181,70 +171,100 @@
                 <td>JENIS PESAWAT/Type of Aircraft</td>
                 <td colspan="4">: {{ $invoice->aircraft_type }}</td>
             </tr>
-
-            <!-- Spacer Row -->
             <tr><td colspan="5" style="padding: 5px;"></td></tr>
 
-            <!-- Location Section -->
             @php
                 $hasDeparture = $invoice->details->contains('movement_type', 'Departure');
                 $hasArrival = $invoice->details->contains('movement_type', 'Arrival');
-                $currentAirportCode = $invoice->airport->iata_code ?? 'WAAT';
+                $currentAirportCode = $invoice->airport->icao_code ?? 'XXXX';
             @endphp
 
-            <!-- Headers -->
-            <tr style="font-weight: bold;">
-                <td>KEBERANGKATAN/Departure</td>
-                <td class="text-center">:</td>
-                <td></td> <!-- L header is empty -->
-                <td class="text-center">Location</td>
-                <td class="text-center">Remark</td>
-            </tr>
-            <tr style="font-weight: bold;">
-                <td></td>
-                <td></td>
-                <td></td>
-                <td class="text-center">1.</td>
-                <td class="text-center">1.</td>
+            <tr>
+                <td></td> <td></td> <td></td>
+                <td class="text-center text-strong">Location</td>
+                <td class="text-center text-strong">Remark</td>
             </tr>
 
-            <!-- Data -->
-            @if($hasArrival)
-            <tr>
-                <td>KEDATANGAN/Arrival</td>
-                <td class="text-center">:</td>
-                <td class="text-center">1</td>
-                <td class="text-center">{{ $invoice->departure_airport }}</td>
-                <td class="text-center">{{ $invoice->departure_airport }}-{{ $currentAirportCode }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td></td>
-                <td class="text-center">2</td>
-                <td class="text-center">-</td>
-                <td class="text-center">-</td>
-            </tr>
+@if($hasArrival && $hasDeparture)
+                <tr>
+                    <td>KEBERANGKATAN/Departure</td>
+                    <td class="text-center">: 1.</td> <td></td>
+                    <td class="text-center">{{ $invoice->departure_airport }}</td>
+                    <td class="text-center">1. {{ $invoice->departure_airport }} - {{ $currentAirportCode }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="text-center">2.</td> <td></td>
+                    <td class="text-center">{{ $currentAirportCode }}</td>
+                    <td class="text-center">2. {{ $currentAirportCode }} - {{ $invoice->arrival_airport }}</td>
+                </tr>
+                <tr>
+                    <td>KEDATANGAN/Arrival</td>
+                    <td class="text-center">: 1.</td> <td></td>
+                    <td class="text-center">{{ $currentAirportCode }}</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="text-center">2.</td> <td></td>
+                    <td class="text-center">{{ $invoice->arrival_airport }}</td>
+                    <td></td>
+                </tr>
+            @elseif($hasArrival)
+                {{-- Hanya Arrival: Pesawat datang dari airport asal ke bandara saat ini --}}
+                <tr>
+                    <td>KEBERANGKATAN/Departure</td>
+                    <td class="text-center">: 1.</td> <td></td>
+                    <td class="text-center">{{ $invoice->departure_airport }}</td>
+                    <td class="text-center">1. {{ $invoice->departure_airport }} - {{ $currentAirportCode }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="text-center">2.</td> <td></td>
+                    <td class="text-center">-</td>
+                    <td class="text-center">2. -</td>
+                </tr>
+                <tr>
+                    <td>KEDATANGAN/Arrival</td>
+                    <td class="text-center">: 1.</td> <td></td>
+                    <td class="text-center">{{ $currentAirportCode }}</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="text-center">2.</td> <td></td>
+                    <td class="text-center">-</td>
+                    <td></td>
+                </tr>
             @elseif($hasDeparture)
-            <tr>
-                <td></td> <!-- Label is empty as it's part of Departure header row -->
-                <td class="text-center">:</td>
-                <td class="text-center">1</td>
-                <td class="text-center">{{ $currentAirportCode }}</td>
-                <td class="text-center">{{ $currentAirportCode }}-{{ $invoice->arrival_airport }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td></td>
-                <td class="text-center">2</td>
-                <td class="text-center">-</td>
-                <td class="text-center">-</td>
-            </tr>
+                {{-- Hanya Departure: Pesawat berangkat dari bandara saat ini ke tujuan --}}
+                <tr>
+                    <td>KEBERANGKATAN/Departure</td>
+                    <td class="text-center">: 1.</td> <td></td>
+                    <td class="text-center">{{ $currentAirportCode }}</td>
+                    <td class="text-center">1. {{ $currentAirportCode }} - {{ $invoice->arrival_airport }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="text-center">2.</td> <td></td>
+                    <td class="text-center">-</td>
+                    <td class="text-center">2. -</td>
+                </tr>
+                <tr>
+                    <td>KEDATANGAN/Arrival</td>
+                    <td class="text-center">: 1.</td> <td></td>
+                    <td class="text-center">{{ $invoice->arrival_airport }}</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="text-center">2.</td> <td></td>
+                    <td class="text-center">-</td>
+                    <td></td>
+                </tr>
             @endif
 
-            <!-- Spacer Row -->
             <tr><td colspan="5" style="padding: 5px;"></td></tr>
-
-            <!-- Simple Rows Continued -->
             <tr>
                 <td>TANGGAL & WAKTU KEDATANGAN/Arrival</td>
                 <td colspan="4">: {{ $invoice->details->where('movement_type', 'Arrival')->first() ? \Carbon\Carbon::parse($invoice->details->where('movement_type', 'Arrival')->first()->actual_time)->format('d M Y, H:i') : '-' }}</td>
@@ -255,80 +275,77 @@
             </tr>
             <tr>
                 <td>DIBAYAR OLEH/Fee Will Be Paid By</td>
-                <td colspan="4">: {{ $invoice->paid_by ?? $invoice->airline }}</td>
+                <td colspan="4">: {{ $invoice->paid_by }}</td>
             </tr>
         </tbody>
     </table>
 
-    <!-- BAGIAN TABEL BIAYA (UPDATED STRUCTURE) -->
+    <!-- BAGIAN TABEL BIAYA -->
     <table class="charges-table">
         <thead>
             <tr>
-                <th rowspan="2" class="va-middle" style="width: 25%;">ADVANCED/EXTENDED CHARGES</th>
-                <th rowspan="2" class="va-middle" style="width: 10%;">START</th>
-                <th rowspan="2" class="va-middle" style="width: 10%;">END</th>
-                <th rowspan="2" class="va-middle" style="width: 10%;">DURATION</th>
-                <th rowspan="2" class="va-middle" style="width: 15%;">RATE</th>
-                <th rowspan="2" class="va-middle" style="width: 15%;">GROSS</th>
-                <th rowspan="2" class="va-middle" style="width: 15%;">PPN/VAT 11%</th>
-                <th rowspan="2" class="va-middle" style="width: 15%;">NET</th>
+                <th class="va-middle" style="width: 25%;">ADVANCED/EXTENDED CHARGES</th>
+                <th class="va-middle" style="width: 10%;">START</th>
+                <th class="va-middle" style="width: 10%;">END</th>
+                <th class="va-middle" style="width: 10%;">DURATION</th>
+                <th class="va-middle" style="width: 15%;">RATE</th>
+                <th class="va-middle" style="width: 15%;">GROSS</th>
+                <th class="va-middle" style="width: 15%;">PPN/VAT 12%</th>
+                <th class="va-middle" style="width: 15%;">NET</th>
             </tr>
-            <tr>
-                <!-- Empty row for spacing -->
-            </tr>
+            <tr></tr>
         </thead>
         <tbody>
-            @foreach($invoice->details as $detail)
+            @php
+                $relevantDetail = $invoice->details->firstWhere('base_charge', '>', 0) ?? $invoice->details->first();
+            @endphp
+            @if($relevantDetail)
             <tr>
                 <td class="text-left" style="padding-left: 8px;">
-                    <small>{{ strtoupper($detail->charge_type) }}</small>
+                    <small>{{ strtoupper($relevantDetail->charge_type) }}</small>
                 </td>
-                <td>{{ \Carbon\Carbon::parse($detail->charge_type == 'Extend' ? $invoice->operational_hour_end : $detail->actual_time)->format('H:i') }}</td>
-                <td>{{ \Carbon\Carbon::parse($detail->charge_type == 'Extend' ? $detail->actual_time : $invoice->operational_hour_start)->format('H:i') }}</td>
-                <td>{{ floor($detail->duration_minutes / 60) }}:{{ str_pad($detail->duration_minutes % 60, 2, '0', STR_PAD_LEFT) }}</td>
+                <td>{{ \Carbon\Carbon::parse($relevantDetail->charge_type == 'Extend' ? $invoice->operational_hour_end : $relevantDetail->actual_time)->format('H:i') }}</td>
+                <td>{{ \Carbon\Carbon::parse($relevantDetail->charge_type == 'Extend' ? $relevantDetail->actual_time : $invoice->operational_hour_start)->format('H:i') }}</td>
+                <td>{{ floor($relevantDetail->duration_minutes / 60) }}:{{ str_pad($relevantDetail->duration_minutes % 60, 2, '0', STR_PAD_LEFT) }}</td>
                 <td class="text-right">
                     @if($invoice->currency == 'USD')
-                        ${{ number_format($detail->base_rate, 0) }}
+                        ${{ number_format($relevantDetail->base_rate, 2) }}
                     @else
-                        Rp {{ number_format($detail->base_rate, 0, ',', '.') }}
+                        Rp {{ number_format($relevantDetail->base_rate, 0, ',', '.') }}
                     @endif
                 </td>
                 <td class="text-right">
                     @if($invoice->currency == 'USD')
-                        ${{ number_format($detail->base_charge, 0) }}
+                        ${{ number_format($invoice->details->sum('base_charge'), 2) }}
                     @else
-                        Rp {{ number_format($detail->base_charge, 0, ',', '.') }}
+                        Rp {{ number_format($invoice->details->sum('base_charge'), 0, ',', '.') }}
                     @endif
                 </td>
                 <td class="text-right">
                     @if($invoice->currency == 'IDR')
-                        Rp {{ number_format($detail->base_charge * 0.11, 0, ',', '.') }}
+                        Rp {{ number_format($invoice->ppn_charge, 0, ',', '.') }}
                     @else
                         -
                     @endif
                 </td>
                 <td class="text-right">
                     @if($invoice->currency == 'IDR')
-                        Rp {{ number_format($detail->base_charge + ($detail->base_charge * 0.11), 0, ',', '.') }}
+                        Rp {{ number_format($invoice->total_charge, 0, ',', '.') }}
                     @else
-                        ${{ number_format($detail->base_charge, 0) }}
+                        ${{ number_format($invoice->total_charge, 2) }}
                     @endif
                 </td>
             </tr>
-            @endforeach
+            @endif
         </tbody>
     </table>
 
-    <!-- BAGIAN TOTAL SECTION (UPDATED) -->
+    <!-- BAGIAN TOTAL SECTION -->
     <table class="total-section">
         <tr>
             <td class="label-col text-left">PPH PASAL 23</td>
             <td class="text-center currency-col">
-                @if($invoice->currency == 'USD')
-                    $
-                @else
-                    Rp
-                @endif
+                @if($invoice->currency == 'USD') $ @else Rp @endif
             </td>
             <td class="text-right amount-col">
                 @if($invoice->currency == 'IDR')
@@ -341,15 +358,11 @@
         <tr>
             <td class="label-col text-left text-strong">T O T A L</td>
             <td class="text-center currency-col text-strong">
-                @if($invoice->currency == 'USD')
-                    $
-                @else
-                    Rp
-                @endif
+                @if($invoice->currency == 'USD') $ @else Rp @endif
             </td>
             <td class="text-right amount-col text-strong">
                 @if($invoice->currency == 'USD')
-                    {{ number_format($invoice->total_charge, 0) }}
+                    {{ number_format($invoice->total_charge, 2) }}
                 @else
                     {{ number_format($invoice->total_charge, 0, ',', '.') }}
                 @endif
@@ -361,7 +374,6 @@
     <div class="note-section">
         Note : Berdasarkan PMK No. 131 Tahun 2024 menggunakan DPP Lain-Lain (11/12 x harga jual / penggantian)x 12%
     </div>
-
     <div class="bank-details-box">
         <table>
             <tr>
@@ -382,20 +394,13 @@
             </tr>
         </table>
     </div>
-
     <table class="footer-table">
         <tr>
-            <!-- Kolom 1: CC Block -->
             <td style="width: 30%;" class="cc-block">
-                CC:<br>
-                1. Customer<br>
-                2. Finance<br>
-                3. File
+                CC:<br> 1. Customer<br> 2. Finance<br> 3. File
             </td>
-            <!-- Kolom 2: Kontainer untuk Tanda Tangan -->
             <td style="width: 70%;" class="signature-block">
                 <div>Petugas Official AIRNAV INDONESIA</div>
-
                 <div>
                 @if($invoice->creator && $invoice->creator->signature && file_exists(storage_path('app/public/' . $invoice->creator->signature)))
                     <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-top: 5px; margin-bottom: 5px;">
@@ -403,7 +408,7 @@
                     <div class="signature-space"></div>
                 @endif
                 </div>
-                <div class="bold">( {{ $invoice->creator->name ?? '..........................' }} )</div>
+                <div class="text-strong">( {{ $invoice->creator->name ?? '..........................' }} )</div>
             </td>
         </tr>
     </table>

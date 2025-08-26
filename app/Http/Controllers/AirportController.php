@@ -4,27 +4,24 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Airport;
-use App\Models\User; // Pastikan User di-import
+use App\Models\User;
 
 class AirportController extends Controller
 {
     public function index()
     {
         $user = auth()->user();
-        $airports = collect(); // Mulai dengan koleksi kosong
+        $airports = collect();
 
         if ($user->role === 'master') {
-            // Master bisa melihat semua bandara
             $airports = Airport::orderBy('iata_code')->get();
         } elseif ($user->role === 'admin' && $user->airport_id) {
-            // Admin hanya melihat bandara yang terhubung dengannya
             $airports = Airport::where('id', $user->airport_id)->get();
         }
 
         return view('airports.index', ['airports' => $airports]);
     }
 
-    // ... metode lain (create, store, edit, update) tetap sama
     public function create()
     {
         return view('airports.create');
@@ -52,11 +49,12 @@ class AirportController extends Controller
 
     public function update(Request $request, Airport $airport)
     {
+        // Validasi tanpa iata_code dan icao_code karena field tersebut di-disable
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'op_start' => 'required|date_format:H:i',
             'op_end' => 'required|date_format:H:i',
-            'icao_code' => 'required|string|max:4|unique:airports,icao_code,' . $airport->id,
+            'is_active' => 'required|boolean',
         ]);
 
         $airport->update($validated);

@@ -7,49 +7,69 @@
         body {
             font-family: 'dejavu sans', sans-serif;
             font-size: 11px;
-            margin: 20px;
+            margin: 15px;
             color: #000;
         }
         table {
             width: 100%;
             border-collapse: collapse;
         }
-        .header-table td { vertical-align: middle; }
-        .header-table .logo { width: 120px; }
-        .header-table .title {
+        .text-strong { font-weight: bold; }
+        .va-middle { vertical-align: middle; }
+        .page-break { page-break-after: always; }
+
+        /* Header */
+        .header-logo { width: 120px; }
+        .header-title {
             text-align: center;
             line-height: 1.3;
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 11px;
+            padding: 0 10px;
         }
-        .header-table .receipt-info { text-align: right; }
+        .receipt-details-box table td {
+            padding: 1px;
+            font-size: 10px;
+        }
+
+        /* Main Content (STRUKTUR BARU) */
         .main-table { margin-top: 20px; }
-        .main-table td { padding: 5px 0; }
-        .main-table .label-col { width: 35%; }
-        .main-table .say-box {
+        .main-table .label-col {
+            width: 35%;
+            padding-right: 10px;
+        }
+        .main-table .value-col {
+            width: 65%;
+        }
+        .main-table td {
+            padding: 4px 0;
+            vertical-align: top;
+        }
+        .say-box {
             border: 1px solid #000;
             padding: 10px;
-            height: 40px;
-            vertical-align: top;
+            min-height: 40px; /* Menggunakan min-height */
             font-style: italic;
         }
+
+        /* Footer */
         .footer-table { margin-top: 30px; }
         .footer-table td { vertical-align: top; }
-
-        /* --- PERBAIKAN CSS DI SINI --- */
-        .footer-table .signature-block {
-            /* Menghapus padding-left yang membuat sempit */
-            /* padding-left: 60%; */
-            text-align: center; /* Tetap tengahkan konten di dalam sel */
+        .signature-block {
+            text-align: center;
+            padding-left: 65%;
         }
-        .footer-table .signature-space { height: 50px; }
-        .footer-table .cc-block { font-size: 9px; }
-        .bold { font-weight: bold; }
+        .signature-space { height: 50px; }
+        .cc-block { font-size: 9px; }
     </style>
 </head>
 <body>
     @php
-        // Helper untuk mengubah angka menjadi terbilang
+        $logoPath = public_path('images/logo.jpg');
+        $logoSrc = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : '';
+
+        $flightTypeCode = ($invoice->flight_type === 'Domestik') ? '21' : '22';
+
+        // --- FUNGSI TERBILANG DIPERBAIKI ---
         function terbilang($nilai) {
             $nilai = abs($nilai);
             $huruf = array("", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas");
@@ -71,105 +91,129 @@
             } else if ($nilai < 1000000000) {
                 $temp = terbilang($nilai/1000000) . " Juta" . terbilang($nilai % 1000000);
             }
-            return trim($temp);
+            // Menghapus trim() dari sini agar spasi tidak hilang saat rekursi
+            return $temp;
         }
-        $logoPath = public_path('images/logo.jpg');
-        $logoSrc = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : '';
 
-        // --- PERBAIKAN LOGIKA KONVERSI RUPIAH ---
-        $totalInRupiah = 0;
-        $totalInWords = '';
-        $exchangeRate = (float) $invoice->usd_exchange_rate; // Ubah ke tipe float untuk memastikan
+        $exchangeRate = (float) $invoice->usd_exchange_rate;
 
-        // Tentukan jumlah total dalam Rupiah terlebih dahulu
+        $finalAmountInRupiah = 0;
         if ($invoice->currency === 'IDR') {
-            $totalInRupiah = $invoice->total_charge;
+            $finalAmountInRupiah = $invoice->total_charge;
         } elseif ($invoice->currency === 'USD' && $exchangeRate > 0) {
-            $totalInRupiah = $invoice->total_charge * $exchangeRate;
+            $finalAmountInRupiah = $invoice->total_charge * $exchangeRate;
         }
 
-        // Tentukan teks "terbilang" berdasarkan hasil konversi Rupiah
-        if ($totalInRupiah > 0) {
-            $totalInWords = terbilang($totalInRupiah) . ' Rupiah';
+        $finalAmountInRupiah = round($finalAmountInRupiah);
+
+        $totalInWords = 'Nol Rupiah';
+        if ($finalAmountInRupiah > 0) {
+            // Menambahkan trim() di sini, hanya pada hasil akhir
+            $totalInWords = trim(terbilang($finalAmountInRupiah)) . ' Rupiah';
         } elseif ($invoice->currency === 'USD') {
             $totalInWords = 'Kurs Belum Diatur atau Tidak Valid';
-        } else {
-            $totalInWords = 'Nol Rupiah';
         }
+
+        $relevantDetail = $invoice->details->firstWhere('base_charge', '>', 0) ?? $invoice->details->first();
+        $paymentType = $relevantDetail ? strtoupper($relevantDetail->charge_type) . ' CHARGES' : 'EXTEND/ADVANCE CHARGES';
+
     @endphp
 
-    <table class="header-table">
-        <tr>
-            <td style="width: 20%;">@if($logoSrc) <img src="{{ $logoSrc }}" class="logo"> @endif</td>
-            <td style="width: 50%;" class="title">
-                AIRNAV INDONESIA<br>
-                PERUM LEMBAGA PENYELENGGARA PELAYANAN NAVIGASI PENERBANGAN INDONESIA<br>
-                ADVANCED/EXTENDED CHARGES
-            </td>
-            <td style="width: 30%;" class="receipt-info">
-                <span class="bold">Receipt Number :</span> WATK.21.2023.09 {{ str_pad($invoice->id, 4, '0', STR_PAD_LEFT) }}
-            </td>
-        </tr>
-    </table>
+    <!-- BAGIAN HEADER KWITANSI -->
+    <div>
+        <!-- Bagian Atas: Logo dan Nomor Kwitansi -->
+        <table style="width: 100%;">
+            <tr>
+                <td style="width: 50%; text-align: left;">
+                    @if($logoSrc) <img src="{{ $logoSrc }}" class="header-logo"> @endif
+                </td>
+                <td style="width: 50%; text-align: right; vertical-align: bottom;">
+                     <div class="receipt-details-box">
+                        <table>
+                             <tr>
+                                 <td><span class="text-strong">Receipt Number</span></td>
+                                 <td>: {{ $invoice->airport->icao_code ?? '' }}.{{ $flightTypeCode }}.{{ \Carbon\Carbon::parse($invoice->created_at)->format('Y.m') }}&nbsp;&nbsp;&nbsp;&nbsp;{{ str_pad($invoice->invoice_sequence_number, 4, '0', STR_PAD_LEFT) }}</td>
+                             </tr>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        </table>
 
+        <!-- Bagian Bawah: Judul -->
+        <table style="width: 100%; margin-top: 20px;">
+            <tr>
+                <td class="header-title va-middle">
+                    <span class="text-strong">AIRNAV INDONESIA</span><br>
+                    PERUM LEMBAGA PENYELENGGARA PELAYANAN NAVIGASI PENERBANGAN INDONESIA<br>
+                    <span class="text-strong">ADVANCED/EXTENDED CHARGES</span>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- GARIS PEMBATAS -->
+    <div style="border-bottom: 1px solid #000; margin-top: 10px; margin-bottom: 10px;"></div>
+
+    <!-- BAGIAN ISI KWITANSI (STRUKTUR BARU) -->
     <table class="main-table">
         <tr>
             <td class="label-col">TANGGAL/Date</td>
-            <td>: {{ \Carbon\Carbon::parse($invoice->created_at)->format('d F Y') }}</td>
+            <td class="value-col">: {{ \Carbon\Carbon::parse($invoice->created_at)->format('d F Y') }}</td>
         </tr>
         <tr>
             <td class="label-col">TERIMA DARI/Received From</td>
-            <td>: {{ $invoice->airline }}</td>
+            <td class="value-col">: {{ $invoice->airline }}</td>
         </tr>
         <tr>
             <td class="label-col">SEJUMLAH/Amount</td>
-            <td>: {{ $invoice->currency }} {{ number_format($invoice->total_charge, 2, ',', '.') }}</td>
+            <td class="value-col">: {{ $invoice->currency }} {{ number_format($invoice->total_charge, $invoice->currency === 'IDR' ? 0 : 2, ',', '.') }}</td>
         </tr>
-        @if($invoice->currency == 'USD')
+
+        @if($invoice->currency == 'USD' && $exchangeRate > 0)
         <tr>
             <td class="label-col">KURS/Exchange Rate</td>
-            <td>: Rp {{ number_format($exchangeRate, 2, ',', '.') }}</td>
+            <td class="value-col">: Rp {{ number_format($exchangeRate, 2, ',', '.') }}</td>
         </tr>
         @endif
+
         <tr>
             <td class="label-col">TERBILANG/Say</td>
-            <td class="say-box">: {{ ucwords($totalInWords) }}</td>
+            <td class="value-col">
+                <div class="say-box">
+                    : {{ ucwords($totalInWords) }}
+                </div>
+            </td>
         </tr>
         <tr>
             <td class="label-col">PEMBAYARAN/Payment</td>
-            <td>: EXTEND/ADVANCE CHARGES</td>
+            <td class="value-col">: {{ $paymentType }}</td>
         </tr>
         <tr>
-            <td class="label-col bold">JUMLAH YANG DIBAYARKAN/Amount To Paid</td>
-            {{-- Selalu tampilkan jumlah akhir dalam Rupiah --}}
-            <td class="bold">: Rp {{ number_format($totalInRupiah, 2, ',', '.') }}</td>
+            <td class="label-col text-strong">JUMLAH YANG DIBAYARKAN/Amount To Paid</td>
+            <td class="value-col text-strong">: Rp {{ number_format($finalAmountInRupiah, 0, ',', '.') }}</td>
         </tr>
     </table>
 
+    <!-- BAGIAN FOOTER KWITANSI -->
     <table class="footer-table">
         <tr>
-            <!-- Kolom 1: CC Block -->
             <td style="width: 30%;" class="cc-block">
                 CC:<br>
                 1. Customer<br>
                 2. Finance<br>
                 3. File
             </td>
-            <!-- Kolom 2: Kontainer untuk Tanda Tangan -->
             <td style="width: 70%;" class="signature-block">
                 <div>Petugas Official AIRNAV INDONESIA</div>
-
-                <div>
                 @if($invoice->creator && $invoice->creator->signature && file_exists(storage_path('app/public/' . $invoice->creator->signature)))
                     <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-top: 5px; margin-bottom: 5px;">
                 @else
                     <div class="signature-space"></div>
                 @endif
-                </div>
-                <div class="bold">( {{ $invoice->creator->name ?? '..........................' }} )</div>
+                <div class="text-strong">( {{ $invoice->creator->name ?? '..........................' }} )</div>
             </td>
         </tr>
     </table>
-
 </body>
 </html>

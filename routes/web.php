@@ -18,41 +18,57 @@ Route::get('/', function () {
 
 Route::get('/dashboard', function (Request $request) {
     $user = auth()->user();
+    $query = Invoice::with('airport')->latest();
+
+    // --- LOGIKA FILTER BARU ---
+
+    // Ambil input filter dari request
+    $selectedAirport = $request->input('airport_id');
     $selectedYear = $request->input('year');
     $selectedMonth = $request->input('month');
-    $selectedAirport = $request->input('airport_id');
 
-    $years = Invoice::selectRaw("YEAR(created_at) as year")->distinct()->orderBy('year', 'desc')->pluck('year');
+    // Filter berdasarkan bandara (jika pengguna adalah master dan memilih bandara)
+    if ($user->role === 'master' && $selectedAirport) {
+        $query->where('airport_id', $selectedAirport);
+    } elseif ($user->role !== 'master' && $user->airport_id) {
+        // Pengguna non-master hanya bisa melihat data bandaranya sendiri
+        $query->where('airport_id', $user->airport_id);
+    }
 
-    // Logika untuk filter bandara
-    $airportsForFilter = collect();
+    // Filter berdasarkan tahun
+    if ($selectedYear) {
+        $query->whereYear('created_at', $selectedYear);
+    }
+
+    // Filter berdasarkan bulan
+    if ($selectedMonth) {
+        $query->whereMonth('created_at', $selectedMonth);
+    }
+
+    // --- AKHIR LOGIKA FILTER ---
+
+    // Ambil data untuk dropdown filter
+    $airports = collect();
     if ($user->role === 'master') {
-        $airportsForFilter = Airport::orderBy('iata_code')->get();
+        $airports = Airport::where('is_active', true)->orderBy('iata_code')->get();
     }
 
-    // Query dasar untuk invoice
-    $invoicesQuery = Invoice::query()->with('airport');
+    // Ambil tahun-tahun unik dari invoice untuk filter
+    $years = Invoice::select(DB::raw('YEAR(created_at) as year'))
+                    ->distinct()
+                    ->orderBy('year', 'desc')
+                    ->pluck('year');
 
-    // Terapkan filter berdasarkan peran pengguna
-    if (in_array($user->role, ['admin', 'user']) && $user->airport_id) {
-        $invoicesQuery->where('airport_id', $user->airport_id);
-    }
-
-    // Terapkan filter dari form (hanya berlaku untuk Master)
-    if ($user->role === 'master') {
-        $invoicesQuery->when($selectedAirport, fn($q, $a) => $q->where('airport_id', $a));
-    }
-
-    $invoicesQuery->when($selectedYear, fn($q, $y) => $q->whereYear('created_at', $y));
-    $invoicesQuery->when($selectedMonth, fn($q, $m) => $q->whereMonth('created_at', $m));
-
-    $invoices = $invoicesQuery->orderBy('created_at', 'desc')->get();
-    $usdRate = DB::table('settings')->where('key', 'usd_exchange_rate')->value('value');
+    // Ambil data invoice dengan paginasi
+    $invoices = $query->paginate(10);
 
     return view('dashboard', [
-        'invoices' => $invoices, 'years' => $years, 'airports' => $airportsForFilter,
-        'usdRate' => $usdRate, 'selectedYear' => $selectedYear,
-        'selectedMonth' => $selectedMonth, 'selectedAirport' => $selectedAirport,
+        'invoices' => $invoices,
+        'airports' => $airports,
+        'years' => $years,
+        'selectedAirport' => $selectedAirport,
+        'selectedYear' => $selectedYear,
+        'selectedMonth' => $selectedMonth,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -68,6 +84,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/invoices/export', [ReportController::class, 'exportInvoicesExcel'])->name('invoices.export.excel');
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'downloadPDF'])->name('invoices.download');
+    Route::middleware('master')->group(function () {
+        Route::get('/invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->name('invoices.edit');
+        Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
+    });
     Route::middleware('admin.access')->group(function () {
         Route::get('/airports', [AirportController::class, 'index'])->name('airports.index');
         Route::get('/airports/{airport}/edit', [AirportController::class, 'edit'])->name('airports.edit');

@@ -43,6 +43,16 @@
                             </div>
                         </div>
 
+                        <!-- Tambahkan field is_active yang hilang -->
+                        <div class="mt-4">
+                            <x-input-label for="is_active" :value="__('Status Aktif')" />
+                            <select id="is_active" name="is_active" class="block mt-1 w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm" required>
+                                <option value="1" {{ old('is_active', $airport->is_active) == 1 ? 'selected' : '' }}>Aktif</option>
+                                <option value="0" {{ old('is_active', $airport->is_active) == 0 ? 'selected' : '' }}>Tidak Aktif</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('is_active')" class="mt-2" />
+                        </div>
+
                         <div class="flex items-center justify-end mt-6">
                             <a href="{{ route('airports.index') }}" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
                                 Batal

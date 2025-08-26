@@ -95,18 +95,25 @@
                             <tbody class="divide-y divide-gray-700">
                                 @forelse ($invoices as $invoice)
                                     <tr>
-                                        {{-- PERBAIKAN DI SINI: Menambahkan null safe operator --}}
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">{{ $invoice->airport->iata_code ?? 'N/A' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $invoice->airline }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $invoice->flight_number }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             {{ number_format($invoice->total_charge, 2) }} {{ $invoice->currency }}
-                                            @if($invoice->currency == 'USD' && isset($usdRate))
-                                                <span class="text-gray-400 text-xs block">(Rp {{ number_format($invoice->total_charge * $usdRate, 2) }})</span>
+                                            @if($invoice->currency == 'USD' && $invoice->usd_exchange_rate > 0)
+                                                <span class="text-gray-400 text-xs block">(Rp {{ number_format($invoice->total_charge * $invoice->usd_exchange_rate, 2) }})</span>
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $invoice->status == 'Lunas' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800' }}">
+                                            @php
+                                                $statusClass = match($invoice->status) {
+                                                    'Lunas' => 'bg-green-200 text-green-800',
+                                                    'Belum Lunas' => 'bg-red-200 text-red-800',
+                                                    'Nonaktif' => 'bg-yellow-200 text-yellow-800',
+                                                    default => 'bg-gray-200 text-gray-800',
+                                                };
+                                            @endphp
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusClass }}">
                                                 {{ $invoice->status }}
                                             </span>
                                         </td>
@@ -119,8 +126,15 @@
                                                     <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-600 bg-gray-700 shadow-sm focus:border-indigo-300 focus:ring-indigo-200">
                                                         <option value="Belum Lunas" @selected($invoice->status == 'Belum Lunas')>Belum Lunas</option>
                                                         <option value="Lunas" @selected($invoice->status == 'Lunas')>Lunas</option>
+                                                        @if(auth()->user()->role === 'master')
+                                                            <option value="Nonaktif" @selected($invoice->status == 'Nonaktif')>Nonaktif</option>
+                                                        @endif
                                                     </select>
                                                 </form>
+                                                <!-- --- TOMBOL EDIT BARU --- -->
+                                                @if(auth()->user()->role === 'master')
+                                                    <a href="{{ route('invoices.edit', $invoice->id) }}" class="text-yellow-400 hover:text-yellow-300">Edit</a>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -131,6 +145,10 @@
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="mt-4">
+                        {{ $invoices->appends(request()->query())->links() }}
                     </div>
                 </div>
             </div>

@@ -10,9 +10,11 @@ class Invoice extends Model
     use HasFactory;
 
     protected $fillable = [
+        'invoice_sequence_number',
         'airport_id', // Baru
         'created_by',
         'airline',
+        'paid_by',
         'ground_handling', // Baru
         'flight_number',
         'flight_number_2', // Baru
@@ -37,6 +39,7 @@ class Invoice extends Model
         'is_free_charge',
         'total_charge',
         'currency',
+        'usd_exchange_rate',
         'status',
         'created_at',
     ];
