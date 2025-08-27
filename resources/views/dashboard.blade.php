@@ -72,6 +72,22 @@
                             </select>
                         </div>
 
+                        {{-- --- FILTER PENGURUTAN BARU --- --}}
+                        <div>
+                            <label for="sort_by" class="block text-sm font-medium text-gray-300">Urutkan</label>
+                            <select name="sort_by" id="sort_by" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                <option value="created_at" @selected($sortBy == 'created_at')>Tanggal Dibuat</option>
+                                <option value="sequence" @selected($sortBy == 'sequence')>Nomor Sequence</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sort_direction" class="block text-sm font-medium text-gray-300">Arah</label>
+                            <select name="sort_direction" id="sort_direction" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                <option value="desc" @selected($sortDirection == 'desc')>Descending</option>
+                                <option value="asc" @selected($sortDirection == 'asc')>Ascending</option>
+                            </select>
+                        </div>
+
                         {{-- Tombol Aksi --}}
                         <div>
                             <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-indigo-500">Filter</button>
@@ -120,18 +136,23 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <div class="flex items-center gap-4">
                                                 <a href="{{ route('invoices.show', $invoice->id) }}" class="text-indigo-400 hover:text-indigo-300">Detail</a>
-                                                <form action="{{ route('invoices.updateStatus', $invoice->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-600 bg-gray-700 shadow-sm focus:border-indigo-300 focus:ring-indigo-200">
-                                                        <option value="Belum Lunas" @selected($invoice->status == 'Belum Lunas')>Belum Lunas</option>
-                                                        <option value="Lunas" @selected($invoice->status == 'Lunas')>Lunas</option>
-                                                        @if(auth()->user()->role === 'master')
-                                                            <option value="Nonaktif" @selected($invoice->status == 'Nonaktif')>Nonaktif</option>
-                                                        @endif
-                                                    </select>
-                                                </form>
-                                                <!-- --- TOMBOL EDIT BARU --- -->
+
+                                                @if(in_array(auth()->user()->role, ['master', 'admin']))
+                                                    @if(auth()->user()->role === 'master' || auth()->user()->airport_id == $invoice->airport_id)
+                                                        <form action="{{ route('invoices.updateStatus', $invoice->id) }}" method="POST">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-600 bg-gray-700 shadow-sm focus:border-indigo-300 focus:ring-indigo-200">
+                                                                <option value="Belum Lunas" @selected($invoice->status == 'Belum Lunas')>Belum Lunas</option>
+                                                                <option value="Lunas" @selected($invoice->status == 'Lunas')>Lunas</option>
+                                                                @if(auth()->user()->role === 'master')
+                                                                    <option value="Nonaktif" @selected($invoice->status == 'Nonaktif')>Nonaktif</option>
+                                                                @endif
+                                                            </select>
+                                                        </form>
+                                                    @endif
+                                                @endif
+
                                                 @if(auth()->user()->role === 'master')
                                                     <a href="{{ route('invoices.edit', $invoice->id) }}" class="text-yellow-400 hover:text-yellow-300">Edit</a>
                                                 @endif

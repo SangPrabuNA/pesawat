@@ -18,7 +18,7 @@ Route::get('/', function () {
 
 Route::get('/dashboard', function (Request $request) {
     $user = auth()->user();
-    $query = Invoice::with('airport')->latest();
+    $query = Invoice::with('airport');
 
     // --- LOGIKA FILTER BARU ---
 
@@ -26,6 +26,8 @@ Route::get('/dashboard', function (Request $request) {
     $selectedAirport = $request->input('airport_id');
     $selectedYear = $request->input('year');
     $selectedMonth = $request->input('month');
+    $sortBy = $request->input('sort_by', 'created_at'); // Default: urutkan berdasarkan tanggal dibuat
+    $sortDirection = $request->input('sort_direction', 'desc');
 
     // Filter berdasarkan bandara (jika pengguna adalah master dan memilih bandara)
     if ($user->role === 'master' && $selectedAirport) {
@@ -45,6 +47,23 @@ Route::get('/dashboard', function (Request $request) {
         $query->whereMonth('created_at', $selectedMonth);
     }
 
+    switch ($sortBy) {
+        case 'sequence':
+            if ($user->role === 'master') {
+                // Master: Urutkan berdasarkan airport dulu, baru nomor sequence
+                $query->orderBy('airport_id', $sortDirection)
+                      ->orderBy('invoice_sequence_number', $sortDirection);
+            } else {
+                // User lain: Urutkan berdasarkan nomor sequence saja
+                $query->orderBy('invoice_sequence_number', $sortDirection);
+            }
+            break;
+        case 'created_at':
+        default:
+            // Urutkan berdasarkan tanggal dibuat (default)
+            $query->orderBy('created_at', $sortDirection);
+            break;
+    }
     // --- AKHIR LOGIKA FILTER ---
 
     // Ambil data untuk dropdown filter
@@ -69,6 +88,8 @@ Route::get('/dashboard', function (Request $request) {
         'selectedAirport' => $selectedAirport,
         'selectedYear' => $selectedYear,
         'selectedMonth' => $selectedMonth,
+        'sortBy' => $sortBy,
+        'sortDirection' => $sortDirection,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 

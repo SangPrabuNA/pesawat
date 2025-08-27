@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\InvoiceDetail; // <-- Change model to InvoiceDetail
+use App\Models\Invoice;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -12,86 +12,160 @@ class InvoicesExport implements FromQuery, WithHeadings, WithMapping
 {
     protected $year;
     protected $month;
-    protected $airportId;
-    private $rowNumber = 0;
+    protected $airport_id;
 
-    public function __construct($year, $month, $airportId)
+    /**
+     * InvoicesExport constructor.
+     *
+     * @param int|null $year
+     * @param int|null $month
+     * @param int|null $airport_id
+     */
+    public function __construct($year = null, $month = null, $airport_id = null)
     {
         $this->year = $year;
         $this->month = $month;
-        $this->airportId = $airportId;
+        $this->airport_id = $airport_id;
+        // Set locale Carbon ke Indonesia untuk format tanggal
+        Carbon::setLocale('id');
     }
 
     /**
-     * The query is now based on InvoiceDetail.
-     */
+    * @return \Illuminate\Database\Eloquent\Builder
+    */
     public function query()
     {
-        return InvoiceDetail::query()
-            ->with(['invoice.airport']) // Eager load relationships
-            ->whereHas('invoice', function ($query) { // Apply filters to the parent invoice
-                $query->when($this->year, function ($q, $year) {
-                    return $q->whereYear('created_at', $year);
-                })
-                ->when($this->month, function ($q, $month) {
-                    return $q->whereMonth('created_at', $month);
-                })
-                ->when($this->airportId, function ($q, $airportId) {
-                    return $q->where('airport_id', $airportId);
-                });
-            })
-            ->orderBy('actual_time', 'asc'); // Now we can correctly order by actual_time
+        // Memulai query dengan eager loading dan mengurutkan berdasarkan nomor sequence
+        $query = Invoice::query()->with(['airport', 'creator', 'details'])->orderBy('invoice_sequence_number', 'asc');
+
+        // Terapkan filter airport_id jika ada
+        if ($this->airport_id) {
+            $query->where('airport_id', $this->airport_id);
+        }
+
+        // Terapkan filter tahun jika ada
+        if ($this->year) {
+            $query->whereYear('created_at', $this->year);
+        }
+
+        // Terapkan filter bulan jika ada
+        if ($this->month) {
+            $query->whereMonth('created_at', $this->month);
+        }
+
+        return $query;
     }
 
     /**
-     * The headings are updated to reflect the detailed view.
+     * @return array
      */
     public function headings(): array
     {
+        // Mendefinisikan header baru untuk file Excel
         return [
-            'NO',
-            'Invoice ID',
-            'Bandara',
-            'Tanggal Aktual',
-            'Waktu Aktual',
-            'Airline',
+            'No Invoice',
+            'Tanggal Invoice',
             'Call Sign',
             'Registrasi A/C',
+            'DOM/INT',
             'Movement',
-            'Jenis Biaya',
+            'ATD/ATA',
+            'Extend/Advance',
             'Durasi (Jam:Menit)',
-            'Total Tagihan (Invoice)',
+            'Tagihan',
+            'PPN 12%',
+            'PPH 23',
+            'Total Tagihan',
             'Status Pembayaran',
         ];
     }
 
     /**
-     * The map function now processes an InvoiceDetail object.
-     * @param InvoiceDetail $detail
+     * @param mixed $invoice
+     * @return array
      */
-    public function map($detail): array
+    public function map($invoice): array
     {
-        $invoice = $detail->invoice; // Get the parent invoice from the relationship
+        // Gabungkan call signs jika ada dua
+        $callSign = $invoice->flight_number;
+        if (!empty($invoice->flight_number_2)) {
+            $callSign .= ' & ' . $invoice->flight_number_2;
+        }
 
-        $totalMinutes = $detail->duration_minutes;
-        $hours = floor($totalMinutes / 60);
-        $minutes = $totalMinutes % 60;
-        $formattedDuration = $hours . ':' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
+        // Ambil data dasar dari relasi 'details'
+        $movements = $invoice->details->pluck('movement_type')->implode(' & ');
+
+        // Logika format durasi
+        $totalDurationMinutes = $invoice->details->sum('duration_minutes');
+        $hours = floor($totalDurationMinutes / 60);
+        $minutes = $totalDurationMinutes % 60;
+        $formattedDuration = sprintf('%02d:%02d', $hours, $minutes);
+
+
+        // Logika terpadu untuk ATD/ATA dan EXTEND/ADVANCE
+        $actualTime = '';
+        $chargeTypeDisplay = ''; // Variabel untuk kolom EXTEND/ADVANCE
+
+        if ($invoice->details->isNotEmpty()) {
+            $detailToUseForTime = null;
+            $hasAdvance = $invoice->details->contains('charge_type', 'Advance');
+            $hasExtend = $invoice->details->contains('charge_type', 'Extend');
+
+            if ($hasAdvance) {
+                $chargeTypeDisplay = 'Advance';
+                $detailToUseForTime = $invoice->details->firstWhere('movement_type', 'Arrival');
+            } elseif ($hasExtend) {
+                $chargeTypeDisplay = 'Extend';
+                $detailToUseForTime = $invoice->details->firstWhere('movement_type', 'Departure');
+            }
+
+            if (!$detailToUseForTime) {
+                $detailToUseForTime = $invoice->details->first();
+            }
+
+            if ($detailToUseForTime) {
+                $actualTime = Carbon::parse($detailToUseForTime->actual_time)->format('H:i');
+            }
+        }
+
+        // --- PERUBAHAN DI SINI: Logika konversi dan format mata uang ---
+        $exchangeRate = $invoice->usd_exchange_rate ?? 1;
+        $isInternational = $invoice->flight_type === 'Internasional';
+
+        // Ambil nilai dasar
+        $baseCharge = $invoice->details->sum('base_charge');
+        $ppnCharge = $invoice->ppn_charge;
+        $pphCharge = $invoice->pph_charge;
+        $totalCharge = $invoice->total_charge;
+
+        // Jika internasional, konversi nilai ke Rupiah
+        if ($isInternational && $exchangeRate > 0) {
+            $baseCharge *= $exchangeRate;
+            $ppnCharge *= $exchangeRate;
+            $pphCharge *= $exchangeRate;
+            $totalCharge *= $exchangeRate;
+        }
+
+        // Fungsi helper untuk memformat angka menjadi format Rupiah tanpa desimal
+        $formatRupiah = function ($amount) {
+            return 'Rp. ' . number_format($amount, 0, ',', '.');
+        };
 
         return [
-            ++$this->rowNumber,
-            $invoice->id,
-            $invoice->airport->iata_code ?? 'N/A',
-            Carbon::parse($detail->actual_time)->format('d-m-Y'),
-            Carbon::parse($detail->actual_time)->format('H:i'),
-            $invoice->airline,
-            $invoice->flight_number,
+            $invoice->invoice_sequence_number,
+            $invoice->created_at->isoFormat('D MMMM YYYY'),
+            $callSign,
             $invoice->registration,
-            $detail->movement_type,
-            $detail->charge_type,
+            $invoice->flight_type,
+            $movements,
+            $actualTime,
+            $chargeTypeDisplay,
             $formattedDuration,
-            number_format($invoice->total_charge, 2) . ' ' . $invoice->currency,
-            $invoice->status,
+            $formatRupiah($baseCharge),
+            $formatRupiah($ppnCharge),
+            $formatRupiah($pphCharge),
+            $formatRupiah($totalCharge),
+            ucfirst($invoice->status),
         ];
     }
 }

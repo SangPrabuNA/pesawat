@@ -352,25 +352,42 @@ class InvoiceController extends Controller
      */
     public function updateStatus(Request $request, Invoice $invoice)
     {
-        // --- PERUBAHAN DI SINI ---
-        // Menambahkan 'Nonaktif' ke dalam aturan validasi
-        $validated = $request->validate(['status' => 'required|in:Lunas,Belum Lunas,Nonaktif']);
+        $validated = $request->validate([
+            'status' => 'required|in:Lunas,Belum Lunas,Nonaktif'
+        ]);
 
         $user = auth()->user();
 
-        // Hanya role 'master' yang bisa mengubah status menjadi 'Nonaktif'
-        if ($validated['status'] === 'Nonaktif' && $user->role !== 'master') {
-            return back()->with('error', 'Anda tidak memiliki hak akses untuk menonaktifkan invoice.');
+        // Periksa role pengguna menggunakan switch
+        switch ($user->role) {
+            case 'master':
+                // Master bisa mengubah status apa pun
+                $invoice->status = $validated['status'];
+                $invoice->save();
+                return back()->with('success', 'Status invoice berhasil diperbarui.');
+
+            case 'admin':
+                // Admin tidak bisa mengubah status menjadi 'Nonaktif'
+                if ($validated['status'] === 'Nonaktif') {
+                    return back()->with('error', 'Anda tidak memiliki hak akses untuk menonaktifkan invoice.');
+                }
+
+                // Admin hanya bisa mengubah status invoice di bandara mereka
+                if ($user->airport_id == $invoice->airport_id) {
+                    $invoice->status = $validated['status'];
+                    $invoice->save();
+                    return back()->with('success', 'Status invoice berhasil diperbarui.');
+                }
+                // Jika airport_id tidak cocok, akan jatuh ke pesan error di bawah
+                break;
+
+            case 'user':
+                // User tidak bisa mengubah status sama sekali, langsung tolak
+                return back()->with('error', 'Anda tidak memiliki hak akses untuk mengubah status.');
         }
 
-        // Semua role yang diizinkan bisa mengubah status lain
-        if (in_array($user->role, ['master', 'admin', 'user'])) {
-            $invoice->status = $validated['status'];
-            $invoice->save();
-            return back()->with('success', 'Status invoice berhasil diperbarui.');
-        }
-
-        return back()->with('error', 'Anda tidak memiliki hak akses untuk mengubah status.');
+        // Jika role adalah admin tapi airport_id tidak cocok, atau role lain yang tidak terdefinisi
+        return back()->with('error', 'Anda tidak memiliki hak akses untuk mengubah status invoice ini.');
     }
 
     /**

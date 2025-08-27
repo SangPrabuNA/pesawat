@@ -293,7 +293,6 @@
                 <th class="va-middle" style="width: 15%;">PPN/VAT 12%</th>
                 <th class="va-middle" style="width: 15%;">NET</th>
             </tr>
-            <tr></tr>
         </thead>
         <tbody>
             @php
