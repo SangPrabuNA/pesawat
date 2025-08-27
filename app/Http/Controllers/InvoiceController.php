@@ -54,7 +54,7 @@ class InvoiceController extends Controller
             'origin_airport' => 'required|string|max:10',
             'movements' => 'required|array|min:1',
             'movements.*' => 'in:Arrival,Departure',
-            // 'destination_airport' divalidasi secara kondisional di bawah
+            'destination_airport' => 'nullable|string|max:10',
             'arrival_time' => 'required_if:movements,Arrival|nullable|date_format:Y-m-d\TH:i',
             'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
             'flight_type' => 'required_without:is_free_charge|in:Domestik,Internasional',
@@ -74,15 +74,21 @@ class InvoiceController extends Controller
         $invoice = null;
 
         DB::transaction(function () use ($request, $validated, &$invoice) {
-            $airport = Airport::lockForUpdate()->find($validated['airport_id']);
+            $airport = Airport::find($validated['airport_id']);
             $isFreeCharge = $request->has('is_free_charge');
             $invoiceDate = Carbon::parse($validated['invoice_date'])->setTimeFrom(now());
+            $currentYear = $invoiceDate->year;
             $usdExchangeRate = (float) ($validated['usd_exchange_rate'] ?? 0);
 
-            // Increment counter dan simpan
-            $airport->invoice_counter += 1;
-            $airport->save();
-            $newSequenceNumber = $airport->invoice_counter;
+            // --- PERUBAHAN DI SINI: Logika reset nomor sequence per tahun ---
+            // Cari nomor sequence terakhir untuk bandara dan tahun yang dipilih
+            $lastSequenceNumber = Invoice::where('airport_id', $validated['airport_id'])
+                                         ->whereYear('created_at', $currentYear)
+                                         ->max('invoice_sequence_number');
+
+            // Nomor baru adalah nomor terakhir + 1, atau 1 jika belum ada
+            $newSequenceNumber = ($lastSequenceNumber ?? 0) + 1;
+            // --- AKHIR PERUBAHAN ---
 
             $hasArrival = in_array('Arrival', $validated['movements']);
             $hasDeparture = in_array('Departure', $validated['movements']);
@@ -109,7 +115,7 @@ class InvoiceController extends Controller
             }
 
             $invoice = Invoice::create([
-                'invoice_sequence_number' => $newSequenceNumber, // Simpan nomor urut baru
+                'invoice_sequence_number' => $newSequenceNumber, // Gunakan nomor sequence baru
                 'created_by' => Auth::id(),
                 'airport_id' => $validated['airport_id'],
                 'airline' => $validated['airline'],

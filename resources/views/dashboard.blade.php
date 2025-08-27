@@ -77,11 +77,11 @@
                             <label for="sort_by" class="block text-sm font-medium text-gray-300">Urutkan</label>
                             <select name="sort_by" id="sort_by" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
                                 <option value="created_at" @selected($sortBy == 'created_at')>Tanggal Dibuat</option>
-                                <option value="sequence" @selected($sortBy == 'sequence')>Nomor Sequence</option>
+                                <option value="sequence" @selected($sortBy == 'sequence')>Nomor Invoice</option>
                             </select>
                         </div>
                         <div>
-                            <label for="sort_direction" class="block text-sm font-medium text-gray-300">Arah</label>
+                            <label for="sort_direction" class="block text-sm font-medium text-gray-300">Asc/Desc</label>
                             <select name="sort_direction" id="sort_direction" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
                                 <option value="desc" @selected($sortDirection == 'desc')>Descending</option>
                                 <option value="asc" @selected($sortDirection == 'asc')>Ascending</option>
