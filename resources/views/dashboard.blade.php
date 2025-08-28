@@ -37,62 +37,71 @@
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
                     <h3 class="text-lg font-semibold mb-4">Riwayat Invoice</h3>
-                    <form method="GET" action="{{ route('dashboard') }}" class="mb-6 flex flex-wrap items-end gap-4">
 
-                        {{-- Filter Bandara (Hanya untuk Master) --}}
-                        @if(auth()->user()->role === 'master')
+                    {{-- --- FORM FILTER DAN PENCARIAN --- --}}
+                    <form method="GET" action="{{ route('dashboard') }}" class="mb-6">
+                        {{-- --- PERUBAHAN DI SINI: Input Pencarian dipindah ke atas --- --}}
+                        <div class="mb-4">
+                            <label for="search" class="block text-sm font-medium text-gray-300">Cari Invoice</label>
+                            <x-text-input id="search" name="search" type="text" class="mt-1 block w-full" :value="$search ?? ''" placeholder="No. Invoice, Airline, No. Flight, Registrasi..." />
+                        </div>
+
+                        <div class="flex flex-wrap items-end gap-4">
+                            {{-- Filter Bandara (Hanya untuk Master) --}}
+                            @if(auth()->user()->role === 'master')
+                                <div>
+                                    <label for="airport_id" class="block text-sm font-medium text-gray-300">Bandara</label>
+                                    <select name="airport_id" id="airport_id" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                        <option value="">Semua Bandara</option>
+                                        @foreach($airports as $airport)
+                                            <option value="{{ $airport->id }}" @selected(isset($selectedAirport) && $selectedAirport == $airport->id)>{{ $airport->iata_code }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+
+                            {{-- Filter Tahun dan Bulan --}}
                             <div>
-                                <label for="airport_id" class="block text-sm font-medium text-gray-300">Bandara</label>
-                                <select name="airport_id" id="airport_id" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
-                                    <option value="">Semua Bandara</option>
-                                    @foreach($airports as $airport)
-                                        <option value="{{ $airport->id }}" @selected($selectedAirport == $airport->id)>{{ $airport->iata_code }}</option>
+                                <label for="year" class="block text-sm font-medium text-gray-300">Tahun</label>
+                                <select name="year" id="year" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                    <option value="">Semua Tahun</option>
+                                    @foreach($years as $year)
+                                        <option value="{{ $year }}" @selected(isset($selectedYear) && $selectedYear == $year)>{{ $year }}</option>
                                     @endforeach
                                 </select>
                             </div>
-                        @endif
+                            <div>
+                                <label for="month" class="block text-sm font-medium text-gray-300">Bulan</label>
+                                <select name="month" id="month" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                    <option value="">Semua Bulan</option>
+                                    @for ($m=1; $m<=12; $m++)
+                                        <option value="{{ $m }}" @selected(isset($selectedMonth) && $selectedMonth == $m)>{{ date('F', mktime(0,0,0,$m, 1)) }}</option>
+                                    @endfor
+                                </select>
+                            </div>
 
-                        {{-- Filter Tahun dan Bulan --}}
-                        <div>
-                            <label for="year" class="block text-sm font-medium text-gray-300">Tahun</label>
-                            <select name="year" id="year" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
-                                <option value="">Semua Tahun</option>
-                                @foreach($years as $year)
-                                    <option value="{{ $year }}" @selected($selectedYear == $year)>{{ $year }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="month" class="block text-sm font-medium text-gray-300">Bulan</label>
-                            <select name="month" id="month" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
-                                <option value="">Semua Bulan</option>
-                                @for ($m=1; $m<=12; $m++)
-                                    <option value="{{ $m }}" @selected($selectedMonth == $m)>{{ date('F', mktime(0,0,0,$m, 1)) }}</option>
-                                @endfor
-                            </select>
-                        </div>
+                            {{-- Filter Pengurutan --}}
+                            <div>
+                                <label for="sort_by" class="block text-sm font-medium text-gray-300">Urutkan</label>
+                                <select name="sort_by" id="sort_by" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                    <option value="created_at" @selected(isset($sortBy) && $sortBy == 'created_at')>Tanggal Dibuat</option>
+                                    <option value="sequence" @selected(isset($sortBy) && $sortBy == 'sequence')>Nomor Invoice</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="sort_direction" class="block text-sm font-medium text-gray-300">Arah</label>
+                                <select name="sort_direction" id="sort_direction" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
+                                    <option value="desc" @selected(isset($sortDirection) && $sortDirection == 'desc')>Descending</option>
+                                    <option value="asc" @selected(isset($sortDirection) && $sortDirection == 'asc')>Ascending</option>
+                                </select>
+                            </div>
 
-                        {{-- --- FILTER PENGURUTAN BARU --- --}}
-                        <div>
-                            <label for="sort_by" class="block text-sm font-medium text-gray-300">Urutkan</label>
-                            <select name="sort_by" id="sort_by" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
-                                <option value="created_at" @selected($sortBy == 'created_at')>Tanggal Dibuat</option>
-                                <option value="sequence" @selected($sortBy == 'sequence')>Nomor Invoice</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="sort_direction" class="block text-sm font-medium text-gray-300">Asc/Desc</label>
-                            <select name="sort_direction" id="sort_direction" class="mt-1 block w-full rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600">
-                                <option value="desc" @selected($sortDirection == 'desc')>Descending</option>
-                                <option value="asc" @selected($sortDirection == 'asc')>Ascending</option>
-                            </select>
-                        </div>
-
-                        {{-- Tombol Aksi --}}
-                        <div>
-                            <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-indigo-500">Filter</button>
-                            <a href="{{ route('dashboard') }}" class="ml-2 inline-flex items-center px-4 py-2 bg-gray-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-gray-500">Reset</a>
-                            <a href="{{ route('invoices.export.excel', request()->query()) }}" class="ml-2 inline-flex items-center px-4 py-2 bg-green-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-green-500">Ekspor</a>
+                            {{-- Tombol Aksi --}}
+                            <div>
+                                <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-indigo-500">Filter</button>
+                                <a href="{{ route('dashboard') }}" class="ml-2 inline-flex items-center px-4 py-2 bg-gray-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-gray-500">Reset</a>
+                                <a href="{{ route('invoices.export.excel', request()->query()) }}" class="ml-2 inline-flex items-center px-4 py-2 bg-green-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-green-500">Ekspor</a>
+                            </div>
                         </div>
                     </form>
 
@@ -100,27 +109,43 @@
                          <table class="min-w-full divide-y divide-gray-700">
                             <thead class="bg-gray-700">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Bandara</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">No. Invoice</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Airline</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">No. Penerbangan</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Total Tagihan</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase">Status</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-700">
                                 @forelse ($invoices as $invoice)
                                     <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">{{ $invoice->airport->iata_code ?? 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            @php
+                                                $flightTypeCode = ($invoice->flight_type === 'Domestik') ? '21' : '22';
+                                                $invoiceDate = \Carbon\Carbon::parse($invoice->created_at);
+                                                echo sprintf(
+                                                    '%s.%s.%s.%s.%s',
+                                                    $invoice->airport->icao_code ?? 'ICAO',
+                                                    $flightTypeCode,
+                                                    $invoiceDate->format('Y'),
+                                                    $invoiceDate->format('m'),
+                                                    str_pad($invoice->invoice_sequence_number, 4, '0', STR_PAD_LEFT)
+                                                );
+                                            @endphp
+                                            <span class="block text-xs text-gray-400">{{ $invoice->airport->iata_code ?? 'N/A' }}</span>
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $invoice->airline }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $invoice->flight_number }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            {{ number_format($invoice->total_charge, 2) }} {{ $invoice->currency }}
-                                            @if($invoice->currency == 'USD' && $invoice->usd_exchange_rate > 0)
-                                                <span class="text-gray-400 text-xs block">(Rp {{ number_format($invoice->total_charge * $invoice->usd_exchange_rate, 2) }})</span>
+                                            @if($invoice->currency == 'USD')
+                                                ${{ number_format($invoice->total_charge, 2) }}
+                                                <span class="text-gray-400 text-xs block">(Rp {{ number_format($invoice->total_charge * $invoice->usd_exchange_rate, 0, ',', '.') }})</span>
+                                            @else
+                                                Rp {{ number_format($invoice->total_charge, 0, ',', '.') }}
                                             @endif
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
                                             @php
                                                 $statusClass = match($invoice->status) {
                                                     'Lunas' => 'bg-green-200 text-green-800',
@@ -153,15 +178,17 @@
                                                     @endif
                                                 @endif
 
-                                                @if(auth()->user()->role === 'master')
-                                                    <a href="{{ route('invoices.edit', $invoice->id) }}" class="text-yellow-400 hover:text-yellow-300">Edit</a>
+                                                @if(in_array(auth()->user()->role, ['master', 'admin']))
+                                                    @if(auth()->user()->role === 'master' || auth()->user()->airport_id == $invoice->airport_id)
+                                                        <a href="{{ route('invoices.edit', $invoice->id) }}" class="text-yellow-400 hover:text-yellow-300">Edit</a>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">Tidak ada data.</td>
+                                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">Tidak ada data.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

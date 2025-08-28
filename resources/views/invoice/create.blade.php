@@ -132,9 +132,11 @@
                                 <div>
                                     <x-input-label for="service_type" :value="__('Jenis Layanan')" />
                                     <select name="service_type" id="service_type" class="block mt-1 w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded-md shadow-sm">
-                                        <option value="APP">APP</option>
-                                        <option value="TWR">TWR</option>
-                                        <option value="AFIS">AFIS</option>
+                                        @foreach($services as $service)
+                                            <option value="{{ $service->name }}" @selected(old('service_type') == $service->name)>
+                                                {{ $service->name }}
+                                            </option>
+                                        @endforeach
                                     </select>
                                 </div>
                             </div>

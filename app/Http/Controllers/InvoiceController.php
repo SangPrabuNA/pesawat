@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Airport;
+use App\Models\Service;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use App\Models\InvoiceDetail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class InvoiceController extends Controller
 {
@@ -33,7 +35,9 @@ class InvoiceController extends Controller
             $airports = Airport::where('id', $user->airport_id)->get();
         }
 
-        return view('invoice.create', ['airports' => $airports]);
+        $services = Service::where('is_active', true)->orderBy('name')->get();
+
+        return view('invoice.create', ['airports' => $airports, 'services' => $services]);
     }
 
     /**
@@ -41,6 +45,7 @@ class InvoiceController extends Controller
      */
     public function store(Request $request)
     {
+        $activeServiceNames = Service::where('is_active', true)->pluck('name')->toArray();
         $validated = $request->validate([
             'airport_id' => 'required|exists:airports,id',
             'airline' => 'required|string|max:255',
@@ -59,7 +64,10 @@ class InvoiceController extends Controller
             'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
             'flight_type' => 'required_without:is_free_charge|in:Domestik,Internasional',
             'usd_exchange_rate' => 'required_if:flight_type,Internasional|nullable|numeric|min:1',
-            'service_type' => 'required_without:is_free_charge|in:APP,TWR,AFIS',
+            'service_type' => [
+                'required_without:is_free_charge',
+                Rule::in($activeServiceNames) // Validasi berdasarkan data di database
+            ],
             'apply_pph' => 'nullable|boolean',
             'is_free_charge' => 'nullable|boolean',
         ]);
@@ -172,7 +180,7 @@ class InvoiceController extends Controller
                     if ($duration_minutes > 0) {
                         $billed_hours = ceil($duration_minutes / 60);
                         if (!$isFreeCharge) {
-                            list($base_rate, $base_charge) = $this->calculateCharges($validated['flight_type'], $validated['service_type'], $billed_hours, $usdExchangeRate);
+                            list($base_rate, $base_charge) = $this->calculateCharges($validated['flight_type'], $validated['service_type'], $billed_hours);
                         }
                     }
                 }
@@ -206,12 +214,13 @@ class InvoiceController extends Controller
     {
         $invoice->load('details');
         $airports = Airport::where('is_active', true)->orderBy('iata_code')->get();
-        return view('invoice.edit', compact('invoice', 'airports'));
+        $services = Service::where('is_active', true)->orderBy('name')->get();
+        return view('invoice.edit', compact('invoice', 'airports', 'services'));
     }
 
     public function update(Request $request, Invoice $invoice)
     {
-        // --- PERBAIKAN VALIDASI DI SINI ---
+        $activeServiceNames = Service::where('is_active', true)->pluck('name')->toArray();
         $rules = [
             'airport_id' => 'required|exists:airports,id',
             'airline' => 'required|string|max:255',
@@ -230,7 +239,10 @@ class InvoiceController extends Controller
             'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
             'flight_type' => 'required_without:is_free_charge|in:Domestik,Internasional',
             'usd_exchange_rate' => 'nullable|numeric', // Aturan dasar
-            'service_type' => 'required_without:is_free_charge|in:APP,TWR,AFIS',
+            'service_type' => [
+                'required_without:is_free_charge',
+                Rule::in($activeServiceNames)
+            ],
             'apply_pph' => 'nullable|boolean',
             'is_free_charge' => 'nullable|boolean',
         ];
@@ -246,6 +258,9 @@ class InvoiceController extends Controller
             $airport = Airport::find($validated['airport_id']);
             $isFreeCharge = $request->has('is_free_charge');
             $usdExchangeRate = (float) ($validated['usd_exchange_rate'] ?? 0);
+
+            $oldDetails = $invoice->details->keyBy('movement_type');
+            $invoice->details()->delete();
 
             $hasArrival = in_array('Arrival', $validated['movements']);
             $hasDeparture = in_array('Departure', $validated['movements']);
@@ -293,7 +308,7 @@ class InvoiceController extends Controller
                     if ($duration_minutes > 0) {
                         $billed_hours = ceil($duration_minutes / 60);
                         if (!$isFreeCharge) {
-                            list($base_rate, $base_charge) = $this->calculateCharges($validated['flight_type'], $validated['service_type'], $billed_hours, $usdExchangeRate);
+                            list($base_rate, $base_charge) = $this->calculateCharges($validated['flight_type'], $validated['service_type'], $billed_hours);
                         }
                     }
                 }
@@ -418,20 +433,22 @@ class InvoiceController extends Controller
     /**
      * Menghitung biaya dasar.
      */
-    private function calculateCharges(string $flight_type, string $service_type, int $billed_hours, ?float $exchange_rate): array
+    private function calculateCharges(string $flight_type, string $service_type, int $billed_hours): array
     {
-        $rates_in_rupiah = ['APP' => 822000, 'TWR' => 575500, 'AFIS' => 246500];
+        $service = Service::where('name', $service_type)->where('is_active', true)->first();
+
+        // Jika layanan tidak ditemukan atau tidak aktif, kembalikan nilai nol
+        if (!$service) {
+            return [0, 0];
+        }
+
         $base_rate = 0;
         $base_charge = 0;
 
-        if ($flight_type == 'Domestik') {
-            $base_rate = $rates_in_rupiah[$service_type];
-            $base_charge = $base_rate * $billed_hours;
-        } elseif ($exchange_rate > 0) { // Internasional
-            $rupiah_rate = $rates_in_rupiah[$service_type];
-            $base_rate = $rupiah_rate / $exchange_rate;
-            $base_charge = $base_rate * $billed_hours;
-        }
+        $base_rate = ($flight_type == 'Domestik') ? $service->rate_idr : $service->rate_usd;
+        $base_charge = $base_rate * $billed_hours;
+
+        return [$base_rate, $base_charge];
         return [$base_rate, $base_charge];
     }
 }

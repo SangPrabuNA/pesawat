@@ -28,6 +28,9 @@
                         <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                             {{ __('Manajemen Pengguna') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('services.index')" :active="request()->routeIs('services.index')">
+                            {{ __('Layanan') }}
+                        </x-nav-link>
                     @endif
                 </div>
             </div>
@@ -94,6 +97,9 @@
             @if(auth()->user()->role === 'master')
                 <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                     {{ __('Manajemen Pengguna') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('services.index')" :active="request()->routeIs('services.index')">
+                    {{ __('Layanan') }}
                 </x-responsive-nav-link>
             @endif
         </div>
