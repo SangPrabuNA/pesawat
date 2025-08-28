@@ -399,15 +399,31 @@
                 CC:<br> 1. Customer<br> 2. Finance<br> 3. File
             </td>
             <td style="width: 70%;" class="signature-block">
-                <div>Petugas Official AIRNAV INDONESIA</div>
-                <div>
-                @if($invoice->creator && $invoice->creator->signature && file_exists(storage_path('app/public/' . $invoice->creator->signature)))
-                    <img src="{{ storage_path('app/public/' . $invoice->creator->signature) }}" style="height: 40px; margin-top: 5px; margin-bottom: 5px;">
-                @else
-                    <div class="signature-space"></div>
-                @endif
+                <div>Manager Administrasi dan Keuangan</div>
+                <div style="height: 80px; margin: 15px 0; text-align: center;">
+                    @if(isset($signatureData) && $signatureData)
+                        <img src="{{ $signatureData }}" style="max-height: 100px; max-width: 300px; height: auto; width: auto;">
+                    @elseif($invoice->signatory && $invoice->signatory->signature)
+                        @php
+                            $signaturePath = storage_path('app/public/' . $invoice->signatory->signature);
+                            $signatureSrc = '';
+                            if (file_exists($signaturePath)) {
+                                $imageData = file_get_contents($signaturePath);
+                                $extension = pathinfo($invoice->signatory->signature, PATHINFO_EXTENSION);
+                                $mimeType = 'image/' . ($extension === 'jpg' ? 'jpeg' : $extension);
+                                $signatureSrc = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
+                            }
+                        @endphp
+                        @if($signatureSrc)
+                            <img src="{{ $signatureSrc }}" style="max-height: 100px; max-width: 300px; height: auto; width: auto;">
+                        @else
+                            <div style="height: 70px;"></div>
+                        @endif
+                    @else
+                        <div style="height: 70px;"></div>
+                    @endif
                 </div>
-                <div class="text-strong">( {{ $invoice->creator->name ?? '..........................' }} )</div>
+                <div class="text-strong">( {{ $invoice->signatory->name ?? '..........................' }} )</div>
             </td>
         </tr>
     </table>

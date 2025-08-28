@@ -42,6 +42,7 @@ class Invoice extends Model
         'usd_exchange_rate',
         'status',
         'created_at',
+        'signatory_id',
     ];
 
     /**
@@ -57,5 +58,8 @@ class Invoice extends Model
     }
     public function creator() {
         return $this->belongsTo(User::class, 'created_by');
+    }
+    public function signatory() {
+        return $this->belongsTo(Signatory::class);
     }
 }

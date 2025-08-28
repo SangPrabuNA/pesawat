@@ -8,6 +8,7 @@ use App\Http\Controllers\AirportController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SignatoryController;
 use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Airport;
@@ -166,6 +167,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/services', [ServiceController::class, 'store'])->name('services.store');
         Route::get('/services/{service}/edit', [ServiceController::class, 'edit'])->name('services.edit');
         Route::patch('/services/{service}', [ServiceController::class, 'update'])->name('services.update');
+        Route::resource('signatories', SignatoryController::class)->except(['show', 'destroy']);
     });
     Route::middleware('admin.access')->group(function () {
         Route::get('/airports', [AirportController::class, 'index'])->name('airports.index');

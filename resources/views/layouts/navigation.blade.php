@@ -31,6 +31,9 @@
                         <x-nav-link :href="route('services.index')" :active="request()->routeIs('services.index')">
                             {{ __('Layanan') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('signatories.index')" :active="request()->routeIs('signatories.*')">
+                            {{ __('Penandatangan') }}
+                        </x-nav-link>
                     @endif
                 </div>
             </div>
@@ -100,6 +103,9 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('services.index')" :active="request()->routeIs('services.index')">
                     {{ __('Layanan') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('signatories.index')" :active="request()->routeIs('signatories.*')">
+                    {{ __('Penandatangan') }}
                 </x-responsive-nav-link>
             @endif
         </div>

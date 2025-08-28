@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Airport;
 use App\Models\Service;
+use App\Models\Signatory;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use App\Models\InvoiceDetail;
@@ -81,7 +82,9 @@ class InvoiceController extends Controller
 
         $invoice = null;
 
-        DB::transaction(function () use ($request, $validated, &$invoice) {
+        $activeSignatory = Signatory::where('is_active', true)->firstOrFail();
+
+        DB::transaction(function () use ($request, $validated, &$invoice, $activeSignatory) {
             $airport = Airport::find($validated['airport_id']);
             $isFreeCharge = $request->has('is_free_charge');
             $invoiceDate = Carbon::parse($validated['invoice_date'])->setTimeFrom(now());
@@ -125,6 +128,7 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'invoice_sequence_number' => $newSequenceNumber, // Gunakan nomor sequence baru
                 'created_by' => Auth::id(),
+                'signatory_id' => $activeSignatory->id,
                 'airport_id' => $validated['airport_id'],
                 'airline' => $validated['airline'],
                 'paid_by' => $validated['paid_by'] ?? $validated['airline'],
@@ -254,13 +258,15 @@ class InvoiceController extends Controller
 
         $validated = $request->validate($rules);
 
-        DB::transaction(function () use ($request, $validated, $invoice) {
+        $activeSignatory = Signatory::where('is_active', true)->firstOrFail();
+
+        DB::transaction(function () use ($request, $validated, $invoice, $activeSignatory) {
             $airport = Airport::find($validated['airport_id']);
             $isFreeCharge = $request->has('is_free_charge');
             $usdExchangeRate = (float) ($validated['usd_exchange_rate'] ?? 0);
 
             $oldDetails = $invoice->details->keyBy('movement_type');
-            $invoice->details()->delete();
+
 
             $hasArrival = in_array('Arrival', $validated['movements']);
             $hasDeparture = in_array('Departure', $validated['movements']);
@@ -301,14 +307,22 @@ class InvoiceController extends Controller
 
                 $duration_minutes = 0; $base_charge = 0; $base_rate = 0; $billed_hours = 0;
 
-                if ($hasArrival && $hasDeparture && $movement === 'Arrival') {
-                    $duration_minutes = 0; $base_charge = 0;
-                } else {
+                $isChargeable = !($hasArrival && $hasDeparture && (($charge_type === 'Extend' && $movement === 'Arrival') || ($charge_type === 'Advance' && $movement === 'Departure')));
+
+                if ($isChargeable) {
                     $duration_minutes = $this->calculateDuration($actual_time, $airport, $charge_type);
                     if ($duration_minutes > 0) {
                         $billed_hours = ceil($duration_minutes / 60);
                         if (!$isFreeCharge) {
-                            list($base_rate, $base_charge) = $this->calculateCharges($validated['flight_type'], $validated['service_type'], $billed_hours);
+                            $oldDetail = $oldDetails->get($movement);
+                            $rateFactorsChanged = $validated['service_type'] !== $invoice->service_type || $validated['flight_type'] !== $invoice->flight_type;
+
+                            if ($oldDetail && !$rateFactorsChanged) {
+                                $base_rate = $oldDetail->base_rate;
+                                $base_charge = $base_rate * $billed_hours;
+                            } else {
+                                list($base_rate, $base_charge) = $this->calculateCharges($validated['flight_type'], $validated['service_type'], $billed_hours);
+                            }
                         }
                     }
                 }
@@ -321,8 +335,8 @@ class InvoiceController extends Controller
                 $totalBaseCharge += $base_charge;
             }
 
-            $ppnCharge = ($invoice->currency == 'IDR' && !$isFreeCharge) ? $totalBaseCharge * 0.11 : 0;
-            $pphCharge = ($request->has('apply_pph') && $invoice->currency == 'IDR' && !$isFreeCharge) ? $totalBaseCharge * 0.02 : 0;
+            $ppnCharge = ($validated['flight_type'] == 'Domestik' && !$isFreeCharge) ? $totalBaseCharge * 0.11 : 0;
+            $pphCharge = ($request->has('apply_pph') && $validated['flight_type'] == 'Domestik' && !$isFreeCharge) ? $totalBaseCharge * 0.02 : 0;
             $totalCharge = $totalBaseCharge + $ppnCharge - $pphCharge;
 
             $invoice->update([
@@ -338,6 +352,7 @@ class InvoiceController extends Controller
                 'usd_exchange_rate' => $usdExchangeRate, 'ppn_charge' => $ppnCharge,
                 'pph_charge' => $pphCharge, 'total_charge' => $totalCharge,
                 'apply_pph' => $request->has('apply_pph'), 'is_free_charge' => $isFreeCharge,
+                'signatory_id' => $activeSignatory->id,
                 'created_at' => Carbon::parse($validated['invoice_date'])->setTimeFrom($invoice->created_at),
             ]);
         });
@@ -347,7 +362,7 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice)
     {
-        $invoice->load('details', 'airport');
+        $invoice->load('details', 'airport', 'signatory');
         return view('invoice.show', ['invoice' => $invoice]);
     }
 
@@ -356,7 +371,7 @@ class InvoiceController extends Controller
      */
     public function downloadPDF(Invoice $invoice)
     {
-        $invoice->load('details', 'airport', 'creator');
+        $invoice->load('details', 'airport', 'signatory');
 
         $invoiceHtml = view('invoice.invoice_pdf', ['invoice' => $invoice])->render();
         $receiptHtml = view('invoice.receipt_pdf', ['invoice' => $invoice])->render();
@@ -448,7 +463,6 @@ class InvoiceController extends Controller
         $base_rate = ($flight_type == 'Domestik') ? $service->rate_idr : $service->rate_usd;
         $base_charge = $base_rate * $billed_hours;
 
-        return [$base_rate, $base_charge];
         return [$base_rate, $base_charge];
     }
 }
