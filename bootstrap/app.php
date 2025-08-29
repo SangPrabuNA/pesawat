@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\CheckIsAdmin::class,
             'master' => \App\Http\Middleware\CheckIsMaster::class,
             'admin.access' => \App\Http\Middleware\CheckHasAdminAccess::class,
+            'unassigned.redirect' => \App\Http\Middleware\RedirectIfUnassigned::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

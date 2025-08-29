@@ -30,7 +30,10 @@ class RegisteredUserController extends Controller
         $request->validate([
             'username' => ['required', 'string', 'max:255', 'unique:'.User::class],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', Rules\Password::min(8)
+                                                                ->mixedCase() // Wajib huruf besar & kecil
+                                                                ->numbers()   // Wajib angka
+                                                                ->symbols()], // Wajib simbol
         ]);
 
         $user = User::create([
