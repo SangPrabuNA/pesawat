@@ -34,6 +34,9 @@
                         <x-nav-link :href="route('signatories.index')" :active="request()->routeIs('signatories.*')">
                             {{ __('Penandatangan') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('bank-accounts.index')" :active="request()->routeIs('bank-accounts.*')">
+                            {{ __('Rekening Bank') }}
+                        </x-nav-link>
                     @endif
                 </div>
             </div>
@@ -106,6 +109,9 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('signatories.index')" :active="request()->routeIs('signatories.*')">
                     {{ __('Penandatangan') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('bank-accounts.index')" :active="request()->routeIs('bank-accounts.*')">
+                            {{ __('Rekening Bank') }}
                 </x-responsive-nav-link>
             @endif
         </div>

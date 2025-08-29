@@ -379,10 +379,14 @@
                 <td style="width: 50%; vertical-align: top;">
                     <span class="text-strong">Detail Bank Transfer :</span>
                     <table>
-                        <tr><td style="width: 30%;">Nama Bank</td><td>: PT. BANK BRI (PERSERO), TBK</td></tr>
-                        <tr><td>Cabang/Branch</td><td>: KCP TUBAN - BALI</td></tr>
-                        <tr><td>Nama Rekening</td><td>: LPPNPI BALI</td></tr>
-                        <tr><td>Nomor Rekening</td><td>: 2201 01 000 212 306</td></tr>
+                        @if($bankAccount)
+                            <tr><td style="width: 30%;">Nama Bank</td><td>: {{ $bankAccount->bank_name }}</td></tr>
+                            <tr><td>Cabang/Branch</td><td>: {{ $bankAccount->branch_name }}</td></tr>
+                            <tr><td>Nama Rekening</td><td>: {{ $bankAccount->account_holder_name }}</td></tr>
+                            <tr><td>Nomor Rekening</td><td>: {{ $bankAccount->account_number }}</td></tr>
+                        @else
+                            <tr><td colspan="2">Detail rekening belum diatur.</td></tr>
+                        @endif
                     </table>
                 </td>
                 <td style="width: 50%; text-align: center; vertical-align: middle;">

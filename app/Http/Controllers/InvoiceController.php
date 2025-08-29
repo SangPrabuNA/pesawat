@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Airport;
 use App\Models\Service;
 use App\Models\Signatory;
+use App\Models\BankAccount;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use App\Models\InvoiceDetail;
@@ -395,8 +396,10 @@ class InvoiceController extends Controller
     {
         $invoice->load('details', 'airport', 'signatory');
 
-        $invoiceHtml = view('invoice.invoice_pdf', ['invoice' => $invoice])->render();
-        $receiptHtml = view('invoice.receipt_pdf', ['invoice' => $invoice])->render();
+        $bankAccount = BankAccount::first();
+
+        $invoiceHtml = view('invoice.invoice_pdf', ['invoice' => $invoice, 'bankAccount' => $bankAccount])->render();
+        $receiptHtml = view('invoice.receipt_pdf', ['invoice' => $invoice, 'bankAccount' => $bankAccount])->render();
 
         $fullHtml = $invoiceHtml . $receiptHtml;
         $pdf = Pdf::loadHtml($fullHtml);

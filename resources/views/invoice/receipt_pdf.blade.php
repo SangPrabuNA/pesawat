@@ -67,6 +67,12 @@
         $logoPath = public_path('images/logo.jpg');
         $logoSrc = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : '';
 
+        $paidStampPath = public_path('images/paid.png');
+        $paidStampSrc = '';
+        if ($invoice->status === 'Lunas' && file_exists($paidStampPath)) {
+            $paidStampSrc = 'data:image/png;base64,' . base64_encode(file_get_contents($paidStampPath));
+        }
+
         $flightTypeCode = ($invoice->flight_type === 'Domestik') ? '21' : '22';
 
         // --- FUNGSI TERBILANG DIPERBAIKI ---
@@ -152,48 +158,50 @@
         </table>
     </div>
 
-    <!-- GARIS PEMBATAS -->
     <div style="border-bottom: 1px solid #000; margin-top: 10px; margin-bottom: 10px;"></div>
 
-    <!-- BAGIAN ISI KWITANSI (STRUKTUR BARU) -->
-    <table class="main-table">
-        <tr>
-            <td class="label-col">TANGGAL/Date</td>
-            <td class="value-col">: {{ \Carbon\Carbon::parse($invoice->created_at)->format('d F Y') }}</td>
-        </tr>
-        <tr>
-            <td class="label-col">TERIMA DARI/Received From</td>
-            <td class="value-col">: {{ $invoice->airline }}</td>
-        </tr>
-        <tr>
-            <td class="label-col">SEJUMLAH/Amount</td>
-            <td class="value-col">: {{ $invoice->currency }} {{ number_format($invoice->total_charge, $invoice->currency === 'IDR' ? 0 : 2, ',', '.') }}</td>
-        </tr>
-
-        @if($invoice->currency == 'USD' && $exchangeRate > 0)
-        <tr>
-            <td class="label-col">KURS/Exchange Rate</td>
-            <td class="value-col">: Rp {{ number_format($exchangeRate, 2, ',', '.') }}</td>
-        </tr>
+    <div style="position: relative;">
+        @if($paidStampSrc)
+            <img src="{{ $paidStampSrc }}" style="position: absolute; right: 80; top: 0; height: 100px; opacity: 0.8;">
         @endif
 
-        <tr>
-            <td class="label-col">TERBILANG/Say</td>
-            <td class="value-col">
-                <div class="say-box">
-                    : {{ ucwords($totalInWords) }}
-                </div>
-            </td>
-        </tr>
-        <tr>
-            <td class="label-col">PEMBAYARAN/Payment</td>
-            <td class="value-col">: {{ $paymentType }}</td>
-        </tr>
-        <tr>
-            <td class="label-col text-strong">JUMLAH YANG DIBAYARKAN/Amount To Paid</td>
-            <td class="value-col text-strong">: Rp {{ number_format($finalAmountInRupiah, 0, ',', '.') }}</td>
-        </tr>
-    </table>
+        <table class="main-table">
+            <tr>
+                <td class="label-col">TANGGAL/Date</td>
+                <td class="value-col">: {{ \Carbon\Carbon::parse($invoice->created_at)->format('d F Y') }}</td>
+            </tr>
+            <tr>
+                <td class="label-col">TERIMA DARI/Received From</td>
+                <td class="value-col">: {{ $invoice->airline }}</td>
+            </tr>
+            <tr>
+                <td class="label-col">SEJUMLAH/Amount</td>
+                <td class="value-col">: {{ $invoice->currency }} {{ number_format($invoice->total_charge, $invoice->currency === 'IDR' ? 0 : 2, ',', '.') }}</td>
+            </tr>
+            @if($invoice->currency == 'USD' && $exchangeRate > 0)
+            <tr>
+                <td class="label-col">KURS/Exchange Rate</td>
+                <td class="value-col">: Rp {{ number_format($exchangeRate, 2, ',', '.') }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td class="label-col">TERBILANG/Say</td>
+                <td class="value-col">
+                    <div class="say-box">
+                        : {{ ucwords($totalInWords) }}
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="label-col">PEMBAYARAN/Payment</td>
+                <td class="value-col">: {{ $paymentType }}</td>
+            </tr>
+            <tr>
+                <td class="label-col text-strong">JUMLAH YANG DIBAYARKAN/Amount To Paid</td>
+                <td class="value-col text-strong">: Rp {{ number_format($finalAmountInRupiah, 0, ',', '.') }}</td>
+            </tr>
+        </table>
+    </div>
 
     <!-- BAGIAN FOOTER KWITANSI -->
     <table class="footer-table">
