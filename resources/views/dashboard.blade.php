@@ -151,6 +151,7 @@
                                                     'Lunas' => 'bg-green-200 text-green-800',
                                                     'Belum Lunas' => 'bg-red-200 text-red-800',
                                                     'Nonaktif' => 'bg-yellow-200 text-yellow-800',
+                                                    'Free Charge' => 'bg-blue-200 text-blue-800',
                                                     default => 'bg-gray-200 text-gray-800',
                                                 };
                                             @endphp
@@ -162,7 +163,7 @@
                                             <div class="flex items-center gap-4">
                                                 <a href="{{ route('invoices.show', $invoice->id) }}" class="text-indigo-400 hover:text-indigo-300">Detail</a>
 
-                                                @if(in_array(auth()->user()->role, ['master', 'admin']))
+                                                @if(!$invoice->is_free_charge && in_array(auth()->user()->role, ['master', 'admin']))
                                                     @if(auth()->user()->role === 'master' || auth()->user()->airport_id == $invoice->airport_id)
                                                         <form action="{{ route('invoices.updateStatus', $invoice->id) }}" method="POST">
                                                             @csrf

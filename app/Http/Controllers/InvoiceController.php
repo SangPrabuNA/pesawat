@@ -64,7 +64,16 @@ class InvoiceController extends Controller
             'arrival_time' => 'required_if:movements,Arrival|nullable|date_format:Y-m-d\TH:i',
             'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
             'flight_type' => 'required_without:is_free_charge|in:Domestik,Internasional',
-            'usd_exchange_rate' => 'required_if:flight_type,Internasional|nullable|numeric|min:1',
+            // --- PERUBAHAN VALIDASI DI SINI ---
+            'usd_exchange_rate' => [
+                Rule::requiredIf(function () use ($request) {
+                    // Wajib diisi hanya jika flight_type adalah Internasional DAN is_free_charge TIDAK dicentang.
+                    return $request->input('flight_type') === 'Internasional' && !$request->has('is_free_charge');
+                }),
+                'nullable',
+                'numeric',
+                'min:1'
+            ],
             'service_type' => [
                 'required_without:is_free_charge',
                 Rule::in($activeServiceNames) // Validasi berdasarkan data di database
@@ -149,6 +158,7 @@ class InvoiceController extends Controller
                 'ppn_charge' => 0, 'pph_charge' => 0, 'total_charge' => 0,
                 'apply_pph' => $request->has('apply_pph'),
                 'is_free_charge' => $isFreeCharge,
+                'status' => $isFreeCharge ? 'Free Charge' : 'Belum Lunas',
                 'created_at' => $invoiceDate,
                 'updated_at' => $invoiceDate,
             ]);
@@ -242,7 +252,15 @@ class InvoiceController extends Controller
             'arrival_time' => 'required_if:movements,Arrival|nullable|date_format:Y-m-d\TH:i',
             'departure_time' => 'required_if:movements,Departure|nullable|date_format:Y-m-d\TH:i',
             'flight_type' => 'required_without:is_free_charge|in:Domestik,Internasional',
-            'usd_exchange_rate' => 'nullable|numeric', // Aturan dasar
+            // --- PERUBAHAN VALIDASI DI SINI JUGA ---
+            'usd_exchange_rate' => [
+                Rule::requiredIf(function () use ($request) {
+                    return $request->input('flight_type') === 'Internasional' && !$request->has('is_free_charge');
+                }),
+                'nullable',
+                'numeric',
+                'min:1'
+            ],
             'service_type' => [
                 'required_without:is_free_charge',
                 Rule::in($activeServiceNames)
@@ -251,11 +269,6 @@ class InvoiceController extends Controller
             'is_free_charge' => 'nullable|boolean',
         ];
 
-        // Tambahkan aturan validasi kurs hanya jika penerbangan Internasional
-        if ($request->input('flight_type') === 'Internasional') {
-            $rules['usd_exchange_rate'] = 'required|numeric|min:1';
-        }
-
         $validated = $request->validate($rules);
 
         $activeSignatory = Signatory::where('is_active', true)->firstOrFail();
@@ -263,6 +276,14 @@ class InvoiceController extends Controller
         DB::transaction(function () use ($request, $validated, $invoice, $activeSignatory) {
             $airport = Airport::find($validated['airport_id']);
             $isFreeCharge = $request->has('is_free_charge');
+
+            $newStatus = $invoice->status; // Default ke status lama
+            if ($isFreeCharge) {
+                $newStatus = 'Free Charge';
+            } elseif ($invoice->is_free_charge && !$isFreeCharge) { // Jika diubah dari free charge menjadi tidak
+                $newStatus = 'Belum Lunas';
+            }
+
             $usdExchangeRate = (float) ($validated['usd_exchange_rate'] ?? 0);
 
             $oldDetails = $invoice->details->keyBy('movement_type');
@@ -352,6 +373,7 @@ class InvoiceController extends Controller
                 'usd_exchange_rate' => $usdExchangeRate, 'ppn_charge' => $ppnCharge,
                 'pph_charge' => $pphCharge, 'total_charge' => $totalCharge,
                 'apply_pph' => $request->has('apply_pph'), 'is_free_charge' => $isFreeCharge,
+                'status' => $newStatus,
                 'signatory_id' => $activeSignatory->id,
                 'created_at' => Carbon::parse($validated['invoice_date'])->setTimeFrom($invoice->created_at),
             ]);
@@ -388,6 +410,10 @@ class InvoiceController extends Controller
      */
     public function updateStatus(Request $request, Invoice $invoice)
     {
+        if ($invoice->is_free_charge) {
+            return back()->with('error', 'Status invoice Free Charge tidak dapat diubah.');
+        }
+
         $validated = $request->validate([
             'status' => 'required|in:Lunas,Belum Lunas,Nonaktif'
         ]);
